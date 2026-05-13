@@ -1,98 +1,155 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function Calculator() {
+  const [display, setDisplay] = useState("0");
+  const [firstNum, setFirstNum] = useState("");
+  const [operator, setOperator] = useState("");
+  const [waitingNext, setWaitingNext] = useState(false);
 
-export default function HomeScreen() {
+  const handleNumber = (num: string) => {
+    if (waitingNext) {
+      setDisplay(num);
+      setWaitingNext(false);
+    } else {
+      setDisplay(display === "0" ? num : display + num);
+    }
+  };
+
+  const handleOperator = (op: string) => {
+    setFirstNum(display);
+    setOperator(op);
+    setWaitingNext(true);
+  };
+
+  const handleEquals = () => {
+    const a = parseFloat(firstNum);
+    const b = parseFloat(display);
+    let result = 0;
+    if (operator === "+") result = a + b;
+    if (operator === "-") result = a - b;
+    if (operator === "×") result = a * b;
+    if (operator === "÷") result = b !== 0 ? a / b : 0;
+    setDisplay(String(result));
+    setFirstNum("");
+    setOperator("");
+    setWaitingNext(true);
+  };
+
+  const handleClear = () => {
+    setDisplay("0");
+    setFirstNum("");
+    setOperator("");
+    setWaitingNext(false);
+  };
+
+  const Button = ({ label, onPress, type = "default" }: any) => (
+    <TouchableOpacity
+      style={[
+        styles.btn,
+        type === "operator" && styles.btnOp,
+        type === "equals" && styles.btnEq,
+        type === "clear" && styles.btnClear,
+      ]}
+      onPress={onPress}
+    >
+      <Text style={[styles.btnText, type === "default" && styles.btnTextDark]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.container}>
+      <View style={styles.displayBox}>
+        <Text style={styles.operatorText}>
+          {firstNum ? `${firstNum} ${operator}` : ""}
+        </Text>
+        <Text style={styles.displayText} numberOfLines={1} adjustsFontSizeToFit>
+          {display}
+        </Text>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.grid}>
+        <Button label="AC" onPress={handleClear} type="clear" />
+        <Button
+          label="+/-"
+          onPress={() => setDisplay(String(parseFloat(display) * -1))}
+          type="operator"
+        />
+        <Button
+          label="%"
+          onPress={() => setDisplay(String(parseFloat(display) / 100))}
+          type="operator"
+        />
+        <Button label="÷" onPress={() => handleOperator("÷")} type="operator" />
+
+        <Button label="7" onPress={() => handleNumber("7")} />
+        <Button label="8" onPress={() => handleNumber("8")} />
+        <Button label="9" onPress={() => handleNumber("9")} />
+        <Button label="×" onPress={() => handleOperator("×")} type="operator" />
+
+        <Button label="4" onPress={() => handleNumber("4")} />
+        <Button label="5" onPress={() => handleNumber("5")} />
+        <Button label="6" onPress={() => handleNumber("6")} />
+        <Button label="-" onPress={() => handleOperator("-")} type="operator" />
+
+        <Button label="1" onPress={() => handleNumber("1")} />
+        <Button label="2" onPress={() => handleNumber("2")} />
+        <Button label="3" onPress={() => handleNumber("3")} />
+        <Button label="+" onPress={() => handleOperator("+")} type="operator" />
+
+        <Button label="0" onPress={() => handleNumber("0")} />
+        <Button
+          label="."
+          onPress={() => {
+            if (!display.includes(".")) setDisplay(display + ".");
+          }}
+        />
+        <Button
+          label="⌫"
+          onPress={() =>
+            setDisplay(display.length > 1 ? display.slice(0, -1) : "0")
+          }
+        />
+        <Button label="=" onPress={handleEquals} type="equals" />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  stepContainer: {
-    gap: 8,
+  displayBox: {
+    width: 340,
+    padding: 16,
+    alignItems: "flex-end",
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  operatorText: { color: "#888", fontSize: 20, marginBottom: 4 },
+  displayText: { color: "#fff", fontSize: 72, fontWeight: "200" },
+  grid: {
+    width: 340,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
   },
+  btn: {
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+    backgroundColor: "#333",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnOp: { backgroundColor: "#FF9F0A" },
+  btnEq: { backgroundColor: "#FF9F0A" },
+  btnClear: { backgroundColor: "#a5a5a5" },
+  btnText: { fontSize: 28, color: "#fff", fontWeight: "400" },
+  btnTextDark: { color: "#fff" },
 });
