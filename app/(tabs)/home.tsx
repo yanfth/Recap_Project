@@ -1,12 +1,12 @@
 import { Stack, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
-    Animated,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Animated,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function HomeScreen() {
@@ -26,18 +26,16 @@ export default function HomeScreen() {
   };
 
   const handleLanjut = () => {
-    if (namaToko.trim() === "") return; // jangan lanjut kalau kosong
-    router.push({
-      pathname: "/dashboard",
-      params: { namaToko }, // kirim nama toko ke halaman berikutnya
-    });
+    if (namaToko.trim() === "") return;
+    router.push(`/dashboard?namaToko=${namaToko}`);
   };
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={styles.card}>
+      {/* Bagian atas putih */}
+      <View style={styles.topArea}>
         <Text style={styles.title}>Ayo Siapkan Toko Mu</Text>
 
         <Text style={styles.label}>Masukkan Nama Toko Mu</Text>
@@ -48,6 +46,7 @@ export default function HomeScreen() {
           placeholderTextColor="#aaa"
           value={namaToko}
           onChangeText={setNamaToko}
+          underlineColorAndroid="transparent" // ← tambahkan ini
         />
 
         <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -66,7 +65,13 @@ export default function HomeScreen() {
         </Animated.View>
       </View>
 
-      <View style={styles.bottomBar} />
+      {/* Bagian bawah biru */}
+      <View style={styles.bottomSheet}>
+        <Text style={styles.recapTitle}>Recap</Text>
+        <Text style={styles.recapSubtitle}>
+          Lebih Mudah Berjualan Dengan <Text style={styles.bold}>Recap</Text>
+        </Text>
+      </View>
     </View>
   );
 }
@@ -74,16 +79,13 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1B2A4A",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  card: {
     backgroundColor: "#fff",
-    borderRadius: 24,
+  },
+  topArea: {
+    flex: 1,
+    backgroundColor: "#fff",
     padding: 32,
-    width: "100%",
+    justifyContent: "center",
     gap: 20,
   },
   title: {
@@ -119,10 +121,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
-  bottomBar: {
-    height: 60,
-    width: "100%",
+  bottomSheet: {
     backgroundColor: "#1B2A4A",
-    marginTop: 16,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 32,
+    paddingBottom: 48,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  recapTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 8,
+  },
+  recapSubtitle: {
+    fontSize: 13,
+    color: "#aab8d4",
+    textAlign: "center",
+  },
+  bold: {
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  circleSmall: {
+    position: "absolute",
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "#aab8d4",
+    bottom: 80,
+    right: 40,
+  },
+  circleLarge: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "#2e4068",
+    bottom: -60,
+    right: -40,
   },
 });
