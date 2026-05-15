@@ -42,7 +42,7 @@ export default function HomeScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder="contoh: Toko Berkah"
+          placeholder="Nama Tokomu"
           placeholderTextColor="#aaa"
           value={namaToko}
           onChangeText={setNamaToko}
