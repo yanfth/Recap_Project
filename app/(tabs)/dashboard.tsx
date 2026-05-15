@@ -1,13 +1,20 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import {
   Animated,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { getMenuList } from "../store/menuStore";
 
 type MenuItem = {
   id: string;
@@ -17,34 +24,23 @@ type MenuItem = {
 };
 
 export default function Dashboard() {
-  const { namaToko, namaMenu, harga, kategori } = useLocalSearchParams();
+  const { namaToko } = useLocalSearchParams();
   const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const [menuList, setMenuList] = useState<MenuItem[]>([]);
-  const [activeTab, setActiveTab] = useState("Makanan");
+  const [activeTab, setActiveTab] = useState("Semua");
 
-  // Tambahkan menu baru jika ada params
-  const addMenu = () => {
-    if (namaMenu && harga && kategori) {
-      const newItem: MenuItem = {
-        id: Date.now().toString(),
-        namaMenu: namaMenu as string,
-        harga: harga as string,
-        kategori: kategori as string,
-      };
-      if (!menuList.find((m) => m.id === newItem.id)) {
-        setMenuList((prev) => [...prev, newItem]);
-      }
-    }
-  };
+  useFocusEffect(
+    useCallback(() => {
+      setMenuList(getMenuList());
+    }, []),
+  );
 
-  // Panggil addMenu sekali saat ada params baru
-  useState(() => {
-    addMenu();
-  });
-
-  const filteredMenu = menuList.filter((m) => m.kategori === activeTab);
+  const filteredMenu =
+    activeTab === "Semua"
+      ? menuList
+      : menuList.filter((m) => m.kategori === activeTab);
 
   const onPressIn = () => {
     Animated.spring(scaleAnim, { toValue: 0.9, useNativeDriver: true }).start();
@@ -77,14 +73,11 @@ export default function Dashboard() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Area putih */}
       <View style={styles.topArea}>
-        {/* Nama Toko */}
         <Text style={styles.tokoName}>{namaToko}</Text>
 
-        {/* Tab Makanan / Minuman */}
         <View style={styles.tabRow}>
-          {["Makanan", "Minuman"].map((tab) => (
+          {["Semua", "Makanan", "Minuman"].map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -102,7 +95,6 @@ export default function Dashboard() {
           ))}
         </View>
 
-        {/* List menu atau kosong */}
         {filteredMenu.length === 0 ? (
           <View style={styles.emptyArea}>
             <Text style={styles.emptyText}>
@@ -114,28 +106,29 @@ export default function Dashboard() {
             data={filteredMenu}
             keyExtractor={(item) => item.id}
             renderItem={renderMenu}
-            contentContainerStyle={{ gap: 12, paddingTop: 16 }}
+            contentContainerStyle={{
+              gap: 12,
+              paddingTop: 16,
+              paddingBottom: 80,
+            }}
             showsVerticalScrollIndicator={false}
           />
         )}
 
-        {/* Tombol + */}
         <Animated.View
           style={[styles.fabWrap, { transform: [{ scale: scaleAnim }] }]}
         >
-          <TouchableOpacity
+          <Pressable
             style={styles.fab}
             onPress={() => router.push(`/addmenu?namaToko=${namaToko}`)}
             onPressIn={onPressIn}
             onPressOut={onPressOut}
-            activeOpacity={1}
           >
             <Text style={styles.fabText}>+</Text>
-          </TouchableOpacity>
+          </Pressable>
         </Animated.View>
       </View>
 
-      {/* Bottom Nav */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem}>
           <Text style={styles.navIcon}>🏠</Text>
@@ -262,6 +255,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 24,
     right: 24,
+    zIndex: 999,
   },
   fab: {
     width: 56,
@@ -274,6 +268,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+    cursor: "pointer",
   },
   fabText: {
     color: "#fff",

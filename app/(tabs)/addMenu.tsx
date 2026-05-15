@@ -1,152 +1,116 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
-    Animated,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { addMenuItem } from "../store/menuStore";
 
-type MenuItem = {
-  id: string;
-  namaMenu: string;
-  harga: string;
-  kategori: string;
-};
-
-export default function Dashboard() {
-  const { namaToko, namaMenu, harga, kategori } = useLocalSearchParams();
+export default function AddMenu() {
+  const { namaToko } = useLocalSearchParams();
   const router = useRouter();
+  const [namaMenu, setNamaMenu] = useState("");
+  const [harga, setHarga] = useState("");
+  const [selectedKategori, setSelectedKategori] = useState("Makanan");
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const [menuList, setMenuList] = useState<MenuItem[]>([]);
-  const [activeTab, setActiveTab] = useState("Makanan");
-
-  // Tambahkan menu baru jika ada params
-  const addMenu = () => {
-    if (namaMenu && harga && kategori) {
-      const newItem: MenuItem = {
-        id: Date.now().toString(),
-        namaMenu: namaMenu as string,
-        harga: harga as string,
-        kategori: kategori as string,
-      };
-      if (!menuList.find((m) => m.id === newItem.id)) {
-        setMenuList((prev) => [...prev, newItem]);
-      }
-    }
-  };
-
-  // Panggil addMenu sekali saat ada params baru
-  useState(() => {
-    addMenu();
-  });
-
-  const filteredMenu = menuList.filter((m) => m.kategori === activeTab);
-
   const onPressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.9, useNativeDriver: true }).start();
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
   };
   const onPressOut = () => {
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
   };
 
-  const renderMenu = ({ item }: { item: MenuItem }) => (
-    <View style={styles.menuCard}>
-      <View style={styles.menuImageBox}>
-        <Text style={styles.menuEmoji}>
-          {item.kategori === "Makanan" ? "🍜" : "🥤"}
-        </Text>
-      </View>
-      <View style={styles.menuInfo}>
-        <Text style={styles.menuName}>{item.namaMenu}</Text>
-        <Text style={styles.menuKal}>55 cal</Text>
-        <Text style={styles.menuHarga}>
-          Rp {parseInt(item.harga).toLocaleString("id-ID")}
-        </Text>
-      </View>
-      <TouchableOpacity style={styles.menuAddBtn}>
-        <Text style={styles.menuAddText}>+</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const kategoriOptions = [
+    { id: "Makanan", label: "Food", emoji: "🍜" },
+    { id: "Minuman", label: "Drink", emoji: "🥤" },
+  ];
+
+  const handleSimpan = () => {
+    if (namaMenu.trim() === "" || harga.trim() === "") return;
+    addMenuItem({ namaMenu, harga, kategori: selectedKategori });
+    router.push(`/dashboard?namaToko=${namaToko}`);
+  };
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Area putih */}
-      <View style={styles.topArea}>
-        {/* Nama Toko */}
-        <Text style={styles.tokoName}>{namaToko}</Text>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Bagian atas putih */}
+        <View style={styles.topArea}>
+          <Text style={styles.title}>Tambah Menu</Text>
+          <Text style={styles.subtitle}>Ayo masukkan Menu Tokomu !</Text>
 
-        {/* Tab Makanan / Minuman */}
-        <View style={styles.tabRow}>
-          {["Makanan", "Minuman"].map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text
+          <Text style={styles.label}>Nama Menu</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ayam Goreng"
+            placeholderTextColor="#aaa"
+            value={namaMenu}
+            onChangeText={setNamaMenu}
+            underlineColorAndroid="transparent"
+          />
+
+          <Text style={styles.label}>Harga</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="contoh: 15000"
+            placeholderTextColor="#aaa"
+            value={harga}
+            onChangeText={setHarga}
+            keyboardType="numeric"
+            underlineColorAndroid="transparent"
+          />
+
+          <Text style={styles.label}>Kategori</Text>
+          <View style={styles.fotoContainer}>
+            {kategoriOptions.map((item) => (
+              <TouchableOpacity
+                key={item.id}
                 style={[
-                  styles.tabText,
-                  activeTab === tab && styles.tabTextActive,
+                  styles.fotoCard,
+                  selectedKategori === item.id && styles.fotoCardSelected,
                 ]}
+                onPress={() => setSelectedKategori(item.id)}
+                activeOpacity={0.8}
               >
-                {tab}
-              </Text>
+                <View style={styles.fotoIconBox}>
+                  <Text style={styles.fotoEmoji}>{item.emoji}</Text>
+                </View>
+                <Text style={styles.fotoLabel}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                (namaMenu.trim() === "" || harga.trim() === "") &&
+                  styles.buttonDisabled,
+              ]}
+              onPress={handleSimpan}
+              onPressIn={onPressIn}
+              onPressOut={onPressOut}
+              activeOpacity={1}
+            >
+              <Text style={styles.buttonText}>Simpan Menu</Text>
             </TouchableOpacity>
-          ))}
+          </Animated.View>
         </View>
 
-        {/* List menu atau kosong */}
-        {filteredMenu.length === 0 ? (
-          <View style={styles.emptyArea}>
-            <Text style={styles.emptyText}>
-              Toko mu Masih Kosong{"\n"}Ayo tambahkan menu{"\n"}untuk tokomu
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredMenu}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMenu}
-            contentContainerStyle={{ gap: 12, paddingTop: 16 }}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-
-        {/* Tombol + */}
-        <Animated.View
-          style={[styles.fabWrap, { transform: [{ scale: scaleAnim }] }]}
-        >
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={() => router.push(`/addmenu?namaToko=${namaToko}`)}
-            onPressIn={onPressIn}
-            onPressOut={onPressOut}
-            activeOpacity={1}
-          >
-            <Text style={styles.fabText}>+</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-
-      {/* Bottom Nav */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>🏠</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>🛒</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>🕐</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Bagian bawah biru - kosong tanpa tulisan */}
+        <View style={styles.bottomSheet} />
+      </ScrollView>
     </View>
   );
 }
@@ -156,141 +120,90 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#1B2A4A",
   },
+  scroll: {
+    flexGrow: 1,
+  },
   topArea: {
     flex: 1,
     backgroundColor: "#fff",
+    padding: 28,
+    gap: 12,
+    justifyContent: "center",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    padding: 28,
-    paddingTop: 48,
   },
-  tokoName: {
+  title: {
     fontSize: 22,
-    fontWeight: "bold",
+    fontWeight: "600",
     color: "#1B2A4A",
-    marginBottom: 16,
+    textAlign: "center",
+    marginBottom: 4,
   },
-  tabRow: {
-    flexDirection: "row",
-    gap: 10,
+  subtitle: {
+    fontSize: 14,
+    color: "#444",
     marginBottom: 8,
   },
-  tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 999,
-    backgroundColor: "#f2f2f2",
-  },
-  tabActive: {
-    backgroundColor: "#1B2A4A",
-  },
-  tabText: {
-    fontSize: 13,
-    color: "#888",
-  },
-  tabTextActive: {
-    color: "#fff",
+  label: {
+    fontSize: 14,
+    color: "#333",
     fontWeight: "500",
   },
-  emptyArea: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  input: {
+    backgroundColor: "#f2f2f2",
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    fontSize: 14,
+    color: "#1B2A4A",
   },
-  emptyText: {
-    fontSize: 16,
-    color: "#bbb",
-    textAlign: "center",
-    lineHeight: 26,
-  },
-  menuCard: {
+  fotoContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 12,
     gap: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: "#f2f2f2",
+    borderRadius: 16,
+    padding: 16,
   },
-  menuImageBox: {
-    width: 70,
-    height: 70,
-    borderRadius: 12,
-    backgroundColor: "#f9f9f9",
+  fotoCard: {
+    alignItems: "center",
+    gap: 8,
+    opacity: 0.4,
+  },
+  fotoCardSelected: {
+    opacity: 1,
+  },
+  fotoIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    backgroundColor: "#1B2A4A",
     alignItems: "center",
     justifyContent: "center",
   },
-  menuEmoji: {
+  fotoEmoji: {
     fontSize: 36,
   },
-  menuInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  menuName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1B2A4A",
-  },
-  menuKal: {
+  fotoLabel: {
     fontSize: 12,
-    color: "#aaa",
+    color: "#444",
   },
-  menuHarga: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1B2A4A",
-    marginTop: 4,
-  },
-  menuAddBtn: {
-    width: 32,
-    height: 32,
+  button: {
+    backgroundColor: "#1B2A4A",
+    paddingVertical: 14,
     borderRadius: 999,
-    backgroundColor: "#1B2A4A",
     alignItems: "center",
-    justifyContent: "center",
+    marginTop: 8,
   },
-  menuAddText: {
+  buttonDisabled: {
+    backgroundColor: "#aaa",
+  },
+  buttonText: {
     color: "#fff",
-    fontSize: 20,
-    lineHeight: 22,
+    fontSize: 16,
+    fontWeight: "500",
   },
-  fabWrap: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 999,
+  bottomSheet: {
+    height: 80,
     backgroundColor: "#1B2A4A",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabText: {
-    color: "#fff",
-    fontSize: 28,
-    lineHeight: 32,
-  },
-  bottomNav: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 16,
-    backgroundColor: "#1B2A4A",
-  },
-  navItem: {
-    alignItems: "center",
-  },
-  navIcon: {
-    fontSize: 24,
   },
 });
