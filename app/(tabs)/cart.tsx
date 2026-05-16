@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { addToCart, getTotalQty } from "../store/cartStore";
 import { getMenuList } from "../store/menuStore";
 
 type MenuItem = {
@@ -24,8 +25,6 @@ type MenuItem = {
   kategori: string;
 };
 
-type CartItem = MenuItem & { qty: number };
-
 export default function Dashboard() {
   const { namaToko } = useLocalSearchParams();
   const router = useRouter();
@@ -33,7 +32,6 @@ export default function Dashboard() {
 
   const [menuList, setMenuList] = useState<MenuItem[]>([]);
   const [activeTab, setActiveTab] = useState("Semua");
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [pesananCount, setPesananCount] = useState(0);
   const [showPopup, setShowPopup] = useState(false);
   const popupOpacity = useRef(new Animated.Value(0)).current;
@@ -85,20 +83,12 @@ export default function Dashboard() {
   };
 
   const handleAddToCart = (item: MenuItem) => {
-    setCart((prev) => {
-      const existing = prev.find((c) => c.id === item.id);
-      if (existing) {
-        return prev.map((c) =>
-          c.id === item.id ? { ...c, qty: c.qty + 1 } : c,
-        );
-      }
-      return [...prev, { ...item, qty: 1 }];
-    });
-    setPesananCount((prev) => prev + 1);
+    addToCart(item);
+    setPesananCount(getTotalQty());
     triggerPopup();
   };
 
-  const totalCart = cart.reduce((sum, c) => sum + c.qty, 0);
+  const totalCart = getTotalQty();
 
   const filteredMenu =
     activeTab === "Semua"
@@ -222,7 +212,10 @@ export default function Dashboard() {
             resizeMode="contain"
           />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push(`/cart?namaToko=${namaToko}`)}
+        >
           <View>
             <Image
               source={require("../../assets/images/cart.png")}
