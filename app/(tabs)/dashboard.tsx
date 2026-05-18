@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { addToCart, getTotalQty } from "../store/cartStore";
 import { getMenuList } from "../store/menuStore";
 
 type MenuItem = {
@@ -24,36 +25,31 @@ type MenuItem = {
   kategori: string;
 };
 
-type CartItem = MenuItem & { qty: number };
-
 export default function Dashboard() {
   const { namaToko } = useLocalSearchParams();
   const router = useRouter();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const [menuList, setMenuList] = useState<MenuItem[]>([]);
   const [activeTab, setActiveTab] = useState("Semua");
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [pesananCount, setPesananCount] = useState(0);
+  const [totalCart, setTotalCart] = useState(0);
   const [showPopup, setShowPopup] = useState(false);
+
+  const scaleAnim = useRef(new Animated.Value(1)).current;
   const popupOpacity = useRef(new Animated.Value(0)).current;
   const popupTranslateY = useRef(new Animated.Value(20)).current;
 
   useFocusEffect(
     useCallback(() => {
-      const list = getMenuList();
-      if (list.length > menuList.length && menuList.length !== 0) {
-        setPesananCount((prev) => prev + (list.length - menuList.length));
-        triggerPopup();
-      }
-      setMenuList(list);
-    }, [menuList.length]),
+      setMenuList(getMenuList());
+      setTotalCart(getTotalQty());
+    }, []),
   );
 
   const triggerPopup = () => {
     popupOpacity.setValue(0);
     popupTranslateY.setValue(20);
     setShowPopup(true);
+
     Animated.parallel([
       Animated.timing(popupOpacity, {
         toValue: 1,
@@ -85,32 +81,22 @@ export default function Dashboard() {
   };
 
   const handleAddToCart = (item: MenuItem) => {
-    setCart((prev) => {
-      const existing = prev.find((c) => c.id === item.id);
-      if (existing) {
-        return prev.map((c) =>
-          c.id === item.id ? { ...c, qty: c.qty + 1 } : c,
-        );
-      }
-      return [...prev, { ...item, qty: 1 }];
-    });
-    setPesananCount((prev) => prev + 1);
+    addToCart(item);
+    const newTotal = getTotalQty();
+    setTotalCart(newTotal);
     triggerPopup();
   };
-
-  const totalCart = cart.reduce((sum, c) => sum + c.qty, 0);
 
   const filteredMenu =
     activeTab === "Semua"
       ? menuList
       : menuList.filter((m) => m.kategori === activeTab);
 
-  const onPressIn = () => {
+  const onPressIn = () =>
     Animated.spring(scaleAnim, { toValue: 0.9, useNativeDriver: true }).start();
-  };
-  const onPressOut = () => {
+
+  const onPressOut = () =>
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
-  };
 
   const renderMenu = ({ item }: { item: MenuItem }) => (
     <View style={styles.menuCard}>
@@ -142,6 +128,7 @@ export default function Dashboard() {
       <View style={styles.topArea}>
         <Text style={styles.tokoName}>{namaToko}</Text>
 
+        {/* Tab filter kategori */}
         <View style={styles.tabRow}>
           {["Semua", "Makanan", "Minuman"].map((tab) => (
             <TouchableOpacity
@@ -161,6 +148,7 @@ export default function Dashboard() {
           ))}
         </View>
 
+        {/* Daftar menu atau placeholder kosong */}
         {filteredMenu.length === 0 ? (
           <View style={styles.emptyArea}>
             <Text style={styles.emptyText}>
@@ -182,7 +170,7 @@ export default function Dashboard() {
         )}
       </View>
 
-      {/* Popup notifikasi */}
+      {/* Popup notifikasi item ditambahkan */}
       {showPopup && (
         <Animated.View
           style={[
@@ -193,13 +181,11 @@ export default function Dashboard() {
             },
           ]}
         >
-          <Text style={styles.popupText}>
-            {pesananCount} pesanan ditambahkan
-          </Text>
+          <Text style={styles.popupText}>{totalCart} item di keranjang</Text>
         </Animated.View>
       )}
 
-      {/* FAB di luar topArea */}
+      {/* FAB tambah menu */}
       <Animated.View
         style={[styles.fabWrap, { transform: [{ scale: scaleAnim }] }]}
       >
@@ -213,7 +199,7 @@ export default function Dashboard() {
         </Pressable>
       </Animated.View>
 
-      {/* Bottom Nav */}
+      {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem}>
           <Image
@@ -222,7 +208,10 @@ export default function Dashboard() {
             resizeMode="contain"
           />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push(`/cart?namaToko=${namaToko}`)}
+        >
           <View>
             <Image
               source={require("../../assets/images/cart.png")}
@@ -236,7 +225,10 @@ export default function Dashboard() {
             )}
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push(`/history?namaToko=${namaToko}`)}
+        >
           <Image
             source={require("../../assets/images/History.png")}
             style={{ width: 28, height: 28 }}
@@ -349,7 +341,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#1B2A4A",
     alignItems: "center",
     justifyContent: "center",
-    cursor: "pointer",
   },
   menuAddText: {
     color: "#fff",
@@ -373,7 +364,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
-    cursor: "pointer",
   },
   fabText: {
     color: "#fff",
@@ -410,9 +400,6 @@ const styles = StyleSheet.create({
   },
   navItem: {
     alignItems: "center",
-  },
-  navIcon: {
-    fontSize: 24,
   },
   cartBadge: {
     position: "absolute",

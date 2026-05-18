@@ -4,123 +4,66 @@ import {
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  Animated,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { addToCart, getTotalQty } from "../store/cartStore";
-import { getMenuList } from "../store/menuStore";
+import { getCart, getTotalHarga, removeFromCart } from "../store/cartStore";
 
-type MenuItem = {
+type CartItem = {
   id: string;
   namaMenu: string;
   harga: string;
   kategori: string;
+  qty: number;
 };
 
-export default function Dashboard() {
+export default function Cart() {
   const { namaToko } = useLocalSearchParams();
   const router = useRouter();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const [menuList, setMenuList] = useState<MenuItem[]>([]);
-  const [activeTab, setActiveTab] = useState("Semua");
-  const [pesananCount, setPesananCount] = useState(0);
-  const [showPopup, setShowPopup] = useState(false);
-  const popupOpacity = useRef(new Animated.Value(0)).current;
-  const popupTranslateY = useRef(new Animated.Value(20)).current;
+  const [cartList, setCartList] = useState<CartItem[]>([]);
+  const [totalHarga, setTotalHarga] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
-      const list = getMenuList();
-      if (list.length > menuList.length && menuList.length !== 0) {
-        setPesananCount((prev) => prev + (list.length - menuList.length));
-        triggerPopup();
-      }
-      setMenuList(list);
-    }, [menuList.length]),
+      setCartList(getCart());
+      setTotalHarga(getTotalHarga());
+    }, []),
   );
 
-  const triggerPopup = () => {
-    popupOpacity.setValue(0);
-    popupTranslateY.setValue(20);
-    setShowPopup(true);
-    Animated.parallel([
-      Animated.timing(popupOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.spring(popupTranslateY, {
-        toValue: 0,
-        tension: 80,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(popupOpacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(popupTranslateY, {
-            toValue: 20,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start(() => setShowPopup(false));
-      }, 2000);
-    });
+  const handleHapus = (id: string) => {
+    removeFromCart(id);
+    setCartList(getCart());
+    setTotalHarga(getTotalHarga());
   };
 
-  const handleAddToCart = (item: MenuItem) => {
-    addToCart(item);
-    setPesananCount(getTotalQty());
-    triggerPopup();
+  const handleBayar = () => {
+    router.push(`/payment?namaToko=${namaToko}`);
   };
 
-  const totalCart = getTotalQty();
-
-  const filteredMenu =
-    activeTab === "Semua"
-      ? menuList
-      : menuList.filter((m) => m.kategori === activeTab);
-
-  const onPressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.9, useNativeDriver: true }).start();
-  };
-  const onPressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
-  };
-
-  const renderMenu = ({ item }: { item: MenuItem }) => (
-    <View style={styles.menuCard}>
-      <View style={styles.menuImageBox}>
-        <Text style={styles.menuEmoji}>
+  const renderItem = ({ item }: { item: CartItem }) => (
+    <View style={styles.card}>
+      <View style={styles.cardIcon}>
+        <Text style={styles.cardEmoji}>
           {item.kategori === "Makanan" ? "🍜" : "🥤"}
         </Text>
       </View>
-      <View style={styles.menuInfo}>
-        <Text style={styles.menuName}>{item.namaMenu}</Text>
-        <Text style={styles.menuKal}>55 cal</Text>
-        <Text style={styles.menuHarga}>
-          Rp {parseInt(item.harga).toLocaleString("id-ID")}
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardName}>{item.namaMenu}</Text>
+        <Text style={styles.cardHarga}>
+          Rp {parseInt(item.harga).toLocaleString("id-ID")} x {item.qty}
+        </Text>
+        <Text style={styles.cardTotal}>
+          Rp {(parseInt(item.harga) * item.qty).toLocaleString("id-ID")}
         </Text>
       </View>
-      <Pressable
-        style={styles.menuAddBtn}
-        onPress={() => handleAddToCart(item)}
-      >
-        <Text style={styles.menuAddText}>+</Text>
+      <Pressable style={styles.hapusBtn} onPress={() => handleHapus(item.id)}>
+        <Text style={styles.hapusText}>✕</Text>
       </Pressable>
     </View>
   );
@@ -129,112 +72,60 @@ export default function Dashboard() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
+      {/* Area putih */}
       <View style={styles.topArea}>
-        <Text style={styles.tokoName}>{namaToko}</Text>
-
-        <View style={styles.tabRow}>
-          {["Semua", "Makanan", "Minuman"].map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === tab && styles.tabTextActive,
-                ]}
-              >
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            {/* <img
+              style={styles.backBtn}
+              src="../../assets/images/arrowleft.png"
+              alt=""
+            /> */}
+            <Text style={styles.backBtn}>← Kembali</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Keranjang</Text>
+          <View style={{ width: 60 }} />
         </View>
 
-        {filteredMenu.length === 0 ? (
+        {cartList.length === 0 ? (
           <View style={styles.emptyArea}>
             <Text style={styles.emptyText}>
-              Toko mu Masih Kosong{"\n"}Ayo tambahkan menu{"\n"}untuk tokomu
+              Keranjang masih kosong{"\n"}Tambahkan menu terlebih dahulu
             </Text>
           </View>
         ) : (
           <FlatList
-            data={filteredMenu}
+            data={cartList}
             keyExtractor={(item) => item.id}
-            renderItem={renderMenu}
+            renderItem={renderItem}
             contentContainerStyle={{
               gap: 12,
               paddingTop: 16,
-              paddingBottom: 100,
+              paddingBottom: 20,
             }}
             showsVerticalScrollIndicator={false}
           />
         )}
       </View>
 
-      {/* Popup notifikasi */}
-      {showPopup && (
-        <Animated.View
-          style={[
-            styles.popup,
-            {
-              opacity: popupOpacity,
-              transform: [{ translateY: popupTranslateY }],
-            },
-          ]}
-        >
-          <Text style={styles.popupText}>
-            {pesananCount} pesanan ditambahkan
+      {/* Area biru bawah */}
+      <View style={styles.bottomSheet}>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Total Pesanan</Text>
+          <Text style={styles.totalHarga}>
+            Rp {totalHarga.toLocaleString("id-ID")}
           </Text>
-        </Animated.View>
-      )}
-
-      {/* FAB di luar topArea */}
-      <Animated.View
-        style={[styles.fabWrap, { transform: [{ scale: scaleAnim }] }]}
-      >
-        <Pressable
-          style={styles.fab}
-          onPress={() => router.push(`/addmenu?namaToko=${namaToko}`)}
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
-        >
-          <Text style={styles.fabText}>+</Text>
-        </Pressable>
-      </Animated.View>
-
-      {/* Bottom Nav */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Image
-            source={require("../../assets/images/home.png")}
-            style={{ width: 28, height: 28 }}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+        </View>
         <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push(`/cart?namaToko=${namaToko}`)}
+          style={[
+            styles.bayarBtn,
+            cartList.length === 0 && styles.bayarBtnDisabled,
+          ]}
+          onPress={handleBayar}
+          disabled={cartList.length === 0}
+          activeOpacity={0.8}
         >
-          <View>
-            <Image
-              source={require("../../assets/images/cart.png")}
-              style={{ width: 28, height: 28 }}
-              resizeMode="contain"
-            />
-            {totalCart > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{totalCart}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Image
-            source={require("../../assets/images/History.png")}
-            style={{ width: 28, height: 28 }}
-            resizeMode="contain"
-          />
+          <Text style={styles.bayarText}>Lanjut ke Pembayaran</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -254,33 +145,21 @@ const styles = StyleSheet.create({
     padding: 28,
     paddingTop: 48,
   },
-  tokoName: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#1B2A4A",
-    marginBottom: 16,
-  },
-  tabRow: {
+  header: {
     flexDirection: "row",
-    gap: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
-  tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 999,
-    backgroundColor: "#f2f2f2",
-  },
-  tabActive: {
-    backgroundColor: "#1B2A4A",
-  },
-  tabText: {
-    fontSize: 13,
-    color: "#888",
-  },
-  tabTextActive: {
-    color: "#fff",
+  backBtn: {
+    fontSize: 14,
+    color: "#1B2A4A",
     fontWeight: "500",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#1B2A4A",
   },
   emptyArea: {
     flex: 1,
@@ -288,12 +167,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#bbb",
     textAlign: "center",
     lineHeight: 26,
   },
-  menuCard: {
+  card: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
@@ -305,122 +184,85 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  menuImageBox: {
-    width: 70,
-    height: 70,
+  cardIcon: {
+    width: 60,
+    height: 60,
     borderRadius: 12,
     backgroundColor: "#f9f9f9",
     alignItems: "center",
     justifyContent: "center",
   },
-  menuEmoji: {
-    fontSize: 36,
+  cardEmoji: {
+    fontSize: 30,
   },
-  menuInfo: {
+  cardInfo: {
     flex: 1,
     gap: 2,
   },
-  menuName: {
+  cardName: {
     fontSize: 15,
     fontWeight: "600",
     color: "#1B2A4A",
   },
-  menuKal: {
+  cardHarga: {
     fontSize: 12,
     color: "#aaa",
   },
-  menuHarga: {
+  cardTotal: {
     fontSize: 14,
     fontWeight: "600",
     color: "#1B2A4A",
-    marginTop: 4,
+    marginTop: 2,
   },
-  menuAddBtn: {
+  hapusBtn: {
     width: 32,
     height: 32,
     borderRadius: 999,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#fee2e2",
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
   },
-  menuAddText: {
-    color: "#fff",
-    fontSize: 20,
-    lineHeight: 22,
-  },
-  fabWrap: {
-    position: "absolute",
-    bottom: 90,
-    right: 28,
-    zIndex: 999,
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 999,
-    backgroundColor: "#1B2A4A",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-    cursor: "pointer",
-  },
-  fabText: {
-    color: "#fff",
-    fontSize: 28,
-    lineHeight: 32,
-  },
-  popup: {
-    position: "absolute",
-    bottom: 90,
-    left: 28,
-    zIndex: 999,
-    backgroundColor: "#fff",
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderWidth: 1.5,
-    borderColor: "#1B2A4A",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  popupText: {
-    color: "#1B2A4A",
+  hapusText: {
+    color: "#e74c3c",
     fontSize: 14,
+    fontWeight: "bold",
+  },
+  bottomSheet: {
+    backgroundColor: "#1B2A4A",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 28,
+    paddingBottom: 40,
+    gap: 16,
+  },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  totalLabel: {
+    fontSize: 16,
+    color: "#aab8d4",
     fontWeight: "500",
   },
-  bottomNav: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 16,
-    backgroundColor: "#1B2A4A",
-  },
-  navItem: {
-    alignItems: "center",
-  },
-  navIcon: {
-    fontSize: 24,
-  },
-  cartBadge: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    backgroundColor: "#e74c3c",
-    borderRadius: 999,
-    width: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cartBadgeText: {
+  totalHarga: {
+    fontSize: 20,
     color: "#fff",
-    fontSize: 11,
     fontWeight: "bold",
+  },
+  bayarBtn: {
+    backgroundColor: "#fff",
+    paddingVertical: 16,
+    borderRadius: 999,
+    alignItems: "center",
+  },
+  bayarBtnDisabled: {
+    backgroundColor: "#4a5e7a",
+  },
+  bayarText: {
+    color: "#1B2A4A",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
