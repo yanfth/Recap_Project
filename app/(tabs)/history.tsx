@@ -11,13 +11,13 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { getHistory, HistoryOrder } from "../store/historyStore";
-import * as WebBrowser from "expo-web-browser";
 
 export default function History() {
   const { namaToko } = useLocalSearchParams();
@@ -26,7 +26,6 @@ export default function History() {
   const [historyList, setHistoryList] = useState<HistoryOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<HistoryOrder | null>(null);
 
-  // Reload every time screen is focused
   useFocusEffect(
     useCallback(() => {
       setHistoryList(getHistory());
@@ -66,6 +65,32 @@ export default function History() {
     return <Text style={{ fontSize: 12, marginRight: 4 }}>💳</Text>;
   };
 
+  // ✅ FIXED: Ganti WebBrowser (tidak perlu) → pakai Share bawaan React Native
+  const handleExport = async () => {
+    if (historyList.length === 0) return;
+
+    const header = "Nomor Struk,Waktu,Metode Bayar,Total Harga,Item\n";
+    const rows = historyList
+      .map((order) => {
+        const items = order.items
+          .map((i) => `${i.namaMenu} x${i.qty}`)
+          .join(" | ");
+        return `${order.nomorStruk},${order.waktu},${order.metodeBayar},${order.totalHarga},"${items}"`;
+      })
+      .join("\n");
+
+    const csvContent = header + rows;
+
+    try {
+      await Share.share({
+        title: `Riwayat Pesanan - ${namaToko}`,
+        message: csvContent,
+      });
+    } catch (error) {
+      console.error("Gagal export:", error);
+    }
+  };
+
   const renderCard = ({
     item,
     index,
@@ -78,11 +103,8 @@ export default function History() {
       onPress={() => setSelectedOrder(item)}
       android_ripple={{ color: "#e8ecf4" }}
     >
-      {/* Left accent bar */}
       <View style={styles.accentBar} />
-
       <View style={styles.cardContent}>
-        {/* Top row */}
         <View style={styles.cardTop}>
           <View style={styles.badgeRow}>
             <View
@@ -101,12 +123,10 @@ export default function History() {
           </Text>
         </View>
 
-        {/* Items preview */}
         <Text style={styles.itemsPreview} numberOfLines={1}>
           {item.items.map((i) => `${i.namaMenu} x${i.qty}`).join("  ·  ")}
         </Text>
 
-        {/* Bottom row */}
         <View style={styles.cardBottom}>
           <Text style={styles.waktuText}>🕐 {formatWaktu(item.waktu)}</Text>
           <Text style={styles.detailHint}>Lihat detail →</Text>
@@ -115,35 +135,12 @@ export default function History() {
     </Pressable>
   );
 
-  const handleExport = async () => {
-    if (historyList.length === 0) return;
-
-    // Buat data CSV
-    const header = "Nomor Struk,Waktu,Metode Bayar,Total Harga,Item\n";
-    const rows = historyList
-      .map((order) => {
-        const items = order.items
-          .map((i) => `${i.namaMenu} x${i.qty}`)
-          .join(" | ");
-        return `${order.nomorStruk},${order.waktu},${order.metodeBayar},${order.totalHarga},"${items}"`;
-      })
-      .join("\n");
-
-    const csvContent = header + rows;
-
-    // Encode ke base64 untuk URL
-    const encoded = encodeURIComponent(csvContent);
-
-    // Buka Google Sheets import via browser
-    const url = `https://docs.google.com/spreadsheets/d/create?usp=sharing`;
-    await WebBrowser.openBrowserAsync(url);
-  };
-
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topArea}>
+        {/* ✅ FIXED: Header layout diperbaiki — export button di kanan, tidak di bawah */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={{ width: 40 }}>
             <Image
@@ -152,11 +149,7 @@ export default function History() {
               resizeMode="contain"
             />
           </TouchableOpacity>
-          <Text style={[styles.title, { flex: 1, textAlign: "center" }]}>
-            Riwayat Pesanan
-          </Text>
-          <View style={{ width: 40 }} />
-          {/* Tombol Export */}
+          <Text style={styles.title}>Riwayat Pesanan</Text>
           <TouchableOpacity
             style={[
               styles.exportBtn,
@@ -166,7 +159,7 @@ export default function History() {
             disabled={historyList.length === 0}
             activeOpacity={0.85}
           >
-            <Text style={styles.exportText}>Eksport Ke Spreadsheet</Text>
+            <Text style={styles.exportText}>Export</Text>
           </TouchableOpacity>
         </View>
 
@@ -229,10 +222,8 @@ export default function History() {
           onPress={() => setSelectedOrder(null)}
         >
           <Pressable style={styles.detailBox} onPress={() => {}}>
-            {/* Handle bar */}
             <View style={styles.handleBar} />
 
-            {/* Header detail */}
             <View style={styles.detailHeader}>
               <View>
                 <Text style={styles.detailNomor}>
@@ -257,7 +248,6 @@ export default function History() {
 
             <View style={styles.dashedLine} />
 
-            {/* Items */}
             <ScrollView
               style={{ maxHeight: 220 }}
               showsVerticalScrollIndicator={false}
@@ -290,7 +280,6 @@ export default function History() {
 
             <View style={styles.dashedLine} />
 
-            {/* Total */}
             <View style={styles.detailTotalRow}>
               <Text style={styles.detailTotalLabel}>TOTAL BAYAR</Text>
               <Text style={styles.detailTotalValue}>
@@ -298,7 +287,6 @@ export default function History() {
               </Text>
             </View>
 
-            {/* Tutup */}
             <TouchableOpacity
               style={styles.tutupBtn}
               onPress={() => setSelectedOrder(null)}
@@ -340,9 +328,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#4B2E2B",
+    flex: 1,
+    textAlign: "center",
   },
-
-  // Summary pill
+  // ✅ FIXED: Export button kecil di header (bukan paddingVertical: 16)
+  exportBtn: {
+    backgroundColor: "#4B2E2B",
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    alignItems: "center",
+  },
+  exportBtnDisabled: {
+    backgroundColor: "#ccc",
+  },
+  exportText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   summaryPill: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -355,7 +359,7 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 13,
-    color: "#ffffffff",
+    color: "#ffffff",
     fontWeight: "500",
   },
   summaryTotal: {
@@ -363,25 +367,19 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
   },
-
-  // Empty state
   emptyArea: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
   },
-  emptyIcon: {
-    fontSize: 52,
-  },
+  emptyIcon: { fontSize: 52 },
   emptyText: {
     fontSize: 15,
     color: "#bbb",
     textAlign: "center",
     lineHeight: 24,
   },
-
-  // Card
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -414,7 +412,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   metodeBadge: {
-    backgroundColor: "#eef0f5",
+    backgroundColor: "#f3eeee",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -424,47 +422,34 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#4B2E2B",
   },
-  nomorStruk: {
-    fontSize: 11,
-    color: "#bbb",
-  },
+  nomorStruk: { fontSize: 11, color: "#bbb" },
   cardTotal: {
     fontSize: 15,
     fontWeight: "700",
     color: "#4B2E2B",
   },
-  itemsPreview: {
-    fontSize: 12,
-    color: "#888",
-  },
+  itemsPreview: { fontSize: 12, color: "#888" },
   cardBottom: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 2,
   },
-  waktuText: {
-    fontSize: 11,
-    color: "#aaa",
-  },
+  waktuText: { fontSize: 11, color: "#aaa" },
   detailHint: {
     fontSize: 11,
     color: "#4B2E2B",
     fontWeight: "600",
   },
-
-  // Bottom bar
   bottomBar: {
     paddingVertical: 18,
     alignItems: "center",
   },
   bottomBarText: {
     fontSize: 13,
-    color: "#ffffffff",
+    color: "#ffffff",
     fontWeight: "500",
   },
-
-  // ===== DETAIL MODAL =====
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -494,13 +479,9 @@ const styles = StyleSheet.create({
   detailNomor: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
-  detailWaktu: {
-    fontSize: 12,
-    color: "#aaa",
-    marginTop: 3,
-  },
+  detailWaktu: { fontSize: 12, color: "#aaa", marginTop: 3 },
   detailMetodeBadge: {
     backgroundColor: "#4B2E2B",
     borderRadius: 20,
@@ -524,17 +505,12 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 10,
   },
-  detailItemEmoji: { fontSize: 22 },
   detailItemName: {
     fontSize: 14,
     fontWeight: "600",
     color: "#4B2E2B",
   },
-  detailItemQty: {
-    fontSize: 12,
-    color: "#aaa",
-    marginTop: 1,
-  },
+  detailItemQty: { fontSize: 12, color: "#aaa", marginTop: 1 },
   detailItemTotal: {
     fontSize: 13,
     fontWeight: "600",
@@ -563,9 +539,5 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
   },
-  tutupText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  tutupText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });
