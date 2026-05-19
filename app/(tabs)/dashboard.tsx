@@ -107,7 +107,7 @@ export default function Dashboard() {
       </View>
       <View style={styles.menuInfo}>
         <Text style={styles.menuName}>{item.namaMenu}</Text>
-        <Text style={styles.menuKal}>55 cal</Text>
+        <Text style={styles.menuKal}>Menu Tersedia</Text>
         <Text style={styles.menuHarga}>
           Rp {parseInt(item.harga).toLocaleString("id-ID")}
         </Text>
@@ -243,7 +243,7 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
   topArea: {
     flex: 1,
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   tokoName: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     marginBottom: 16,
   },
   tabRow: {
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f2f2f2",
   },
   tabActive: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
   tabText: {
     fontSize: 13,
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   menuName: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   menuKal: {
     fontSize: 12,
@@ -331,14 +331,14 @@ const styles = StyleSheet.create({
   menuHarga: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     marginTop: 4,
   },
   menuAddBtn: {
     width: 32,
     height: 32,
     borderRadius: 999,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 999,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -380,14 +380,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderWidth: 1.5,
-    borderColor: "#1B2A4A",
+    borderColor: "#4B2E2B",
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
   },
   popupText: {
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 16,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
   navItem: {
     alignItems: "center",

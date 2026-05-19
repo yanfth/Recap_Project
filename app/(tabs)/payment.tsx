@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -72,10 +73,14 @@ export default function Payment() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>← Kembali</Text>
+            <Image
+              source={require("../../assets/images/arrow-back.png")}
+              style={styles.backIcon}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
           <Text style={styles.title}>Pembayaran</Text>
-          <View style={{ width: 70 }} />
+          <View style={{ width: 24 }} />
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -84,9 +89,15 @@ export default function Payment() {
             <Text style={styles.sectionTitle}>Ringkasan Pesanan</Text>
             {cartList.map((item) => (
               <View key={item.id} style={styles.orderRow}>
-                <Text style={styles.orderEmoji}>
-                  {item.kategori === "Makanan" ? "🍜" : "🥤"}
-                </Text>
+                <Image
+                  source={
+                    item.kategori === "Makanan"
+                      ? require("../../assets/images/Food.png")
+                      : require("../../assets/images/Drink.png")
+                  }
+                  style={styles.orderImage}
+                  resizeMode="contain"
+                />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.orderName}>{item.namaMenu}</Text>
                   <Text style={styles.orderQty}>x{item.qty}</Text>
@@ -118,7 +129,11 @@ export default function Payment() {
               onPress={() => setMetodeBayar("Cash")}
             >
               <View style={styles.metodeIcon}>
-                <Text style={styles.metodeEmoji}>💵</Text>
+                <Image
+                  source={require("../../assets/images/Cash.png")}
+                  style={styles.metodeImage}
+                  resizeMode="contain"
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <Text
@@ -150,7 +165,11 @@ export default function Payment() {
               onPress={() => setMetodeBayar("QRIS")}
             >
               <View style={styles.metodeIcon}>
-                <Text style={styles.metodeEmoji}>📱</Text>
+                <Image
+                  source={require("../../assets/images/Qr.png")}
+                  style={styles.metodeImage}
+                  resizeMode="contain"
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <Text
@@ -307,7 +326,7 @@ export default function Payment() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
   topArea: {
     flex: 1,
@@ -323,15 +342,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
   },
-  backBtn: {
-    fontSize: 14,
-    color: "#1B2A4A",
-    fontWeight: "500",
+  backIcon: {
+    width: 24,
+    height: 24,
   },
   title: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
 
   // Section
@@ -354,18 +372,18 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 8,
   },
-  orderEmoji: { fontSize: 20 },
-  orderName: { fontSize: 14, fontWeight: "600", color: "#1B2A4A" },
+  orderImage: { width: 30, height: 30 },
+  orderName: { fontSize: 14, fontWeight: "600", color: "#4B2E2B" },
   orderQty: { fontSize: 12, color: "#aaa" },
-  orderHarga: { fontSize: 14, fontWeight: "600", color: "#1B2A4A" },
+  orderHarga: { fontSize: 14, fontWeight: "600", color: "#4B2E2B" },
   divider: { height: 1, backgroundColor: "#f0f0f0", marginVertical: 10 },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  totalLabel: { fontSize: 15, fontWeight: "600", color: "#1B2A4A" },
-  totalValue: { fontSize: 16, fontWeight: "bold", color: "#1B2A4A" },
+  totalLabel: { fontSize: 15, fontWeight: "600", color: "#4B2E2B" },
+  totalValue: { fontSize: 16, fontWeight: "bold", color: "#4B2E2B" },
 
   // Metode Card
   metodeCard: {
@@ -380,7 +398,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   metodeCardActive: {
-    borderColor: "#1B2A4A",
+    borderColor: "#4B2E2B",
     backgroundColor: "#eef0f5",
   },
   metodeIcon: {
@@ -395,13 +413,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  metodeEmoji: { fontSize: 22 },
+  metodeImage: { width: 32, height: 32 },
   metodeName: {
     fontSize: 15,
     fontWeight: "600",
     color: "#555",
   },
-  metodeNameActive: { color: "#1B2A4A" },
+  metodeNameActive: { color: "#4B2E2B" },
   metodeDesc: { fontSize: 12, color: "#aaa", marginTop: 1 },
   radioOuter: {
     width: 22,
@@ -412,12 +430,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  radioOuterActive: { borderColor: "#1B2A4A" },
+  radioOuterActive: { borderColor: "#4B2E2B" },
   radioInner: {
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
 
   // QRIS Box
@@ -431,7 +449,7 @@ const styles = StyleSheet.create({
   qrisTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     marginBottom: 14,
   },
   qrPlaceholder: {
@@ -445,12 +463,12 @@ const styles = StyleSheet.create({
     borderColor: "#e0e0e0",
     marginBottom: 12,
   },
-  qrText: { fontSize: 80, color: "#1B2A4A" },
+  qrText: { fontSize: 80, color: "#4B2E2B" },
   qrisHint: { fontSize: 12, color: "#aaa" },
 
   // Bottom Sheet
   bottomSheet: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     padding: 24,
     paddingBottom: 40,
     gap: 14,
@@ -468,8 +486,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
   },
-  bayarBtnDisabled: { backgroundColor: "#4a5e7a" },
-  bayarText: { color: "#1B2A4A", fontSize: 16, fontWeight: "600" },
+  bayarBtnDisabled: { backgroundColor: "#444141ff" },
+  bayarText: { color: "#4B2E2B", fontSize: 16, fontWeight: "600" },
   bayarTextDisabled: { color: "#8a9ab5" },
 
   // ===== STRUK MODAL =====
@@ -491,7 +509,7 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     fontSize: 44,
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     backgroundColor: "#e8ecf4",
     width: 72,
     height: 72,
@@ -504,7 +522,7 @@ const styles = StyleSheet.create({
   strukSuccessText: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     marginBottom: 4,
   },
   strukSubText: { fontSize: 13, color: "#aaa" },
@@ -520,7 +538,7 @@ const styles = StyleSheet.create({
   namaTokoStruk: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     marginBottom: 4,
     textAlign: "center",
   },
@@ -529,7 +547,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   infoKey: { fontSize: 13, color: "#aaa" },
-  infoVal: { fontSize: 13, fontWeight: "600", color: "#1B2A4A" },
+  infoVal: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
 
   strukItems: { gap: 8 },
   strukItemRow: {
@@ -543,8 +561,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  strukItemQty: { color: "#aaa" },
-  strukItemHarga: { fontSize: 13, fontWeight: "600", color: "#1B2A4A" },
+  strukItemQty: { color: "#fff" },
+  strukItemHarga: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
 
   strukTotalRow: {
     flexDirection: "row",
@@ -554,25 +572,25 @@ const styles = StyleSheet.create({
   strukTotalLabel: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     letterSpacing: 1,
   },
   strukTotalValue: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
 
   strukFooter: {
     textAlign: "center",
     fontSize: 13,
-    color: "#aaa",
+    color: "#dbdbdbff",
     marginTop: 16,
     marginBottom: 20,
   },
 
   selesaiBtn: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     paddingVertical: 16,
     borderRadius: 999,
     alignItems: "center",

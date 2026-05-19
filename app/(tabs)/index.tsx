@@ -1,5 +1,5 @@
 import { Stack, useRouter } from "expo-router";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -8,8 +8,13 @@ export default function WelcomeScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Bagian atas - area gambar */}
-      <View style={styles.imageArea} />
+      <View style={styles.imageArea}>
+        <Image
+        // source={require("../../assets/images/Drink.png")}
+        // style={styles.welcomeImage}
+        // resizeMode="contain"
+        />
+      </View>
 
       {/* Bagian bawah - biru gelap */}
       <View style={styles.bottomSheet}>
@@ -41,9 +46,15 @@ const styles = StyleSheet.create({
   imageArea: {
     flex: 1,
     backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  welcomeImage: {
+    width: "80%",
+    height: "80%",
   },
   bottomSheet: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 32,
@@ -63,7 +74,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: "#aab8d4",
+    color: "#fff",
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 32,
@@ -76,7 +87,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   buttonText: {
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     fontSize: 16,
     fontWeight: "500",
   },

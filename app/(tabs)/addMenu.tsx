@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
   Animated,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,8 +31,16 @@ export default function AddMenu() {
   };
 
   const kategoriOptions = [
-    { id: "Makanan", label: "Food", emoji: "🍜" },
-    { id: "Minuman", label: "Drink", emoji: "🥤" },
+    {
+      id: "Makanan",
+      label: "Food",
+      image: require("../../assets/images/Food.png"),
+    },
+    {
+      id: "Minuman",
+      label: "Drink",
+      image: require("../../assets/images/Drink.png"),
+    },
   ];
 
   const handleSimpan = () => {
@@ -84,7 +93,11 @@ export default function AddMenu() {
                 activeOpacity={0.8}
               >
                 <View style={styles.fotoIconBox}>
-                  <Text style={styles.fotoEmoji}>{item.emoji}</Text>
+                  <Image
+                    source={item.image}
+                    style={styles.fotoImage}
+                    resizeMode="contain"
+                  />
                 </View>
                 <Text style={styles.fotoLabel}>{item.label}</Text>
               </TouchableOpacity>
@@ -118,7 +131,7 @@ export default function AddMenu() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
   scroll: {
     flexGrow: 1,
@@ -135,7 +148,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     textAlign: "center",
     marginBottom: 4,
   },
@@ -155,7 +168,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     fontSize: 14,
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   fotoContainer: {
     flexDirection: "row",
@@ -176,19 +189,20 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 16,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     alignItems: "center",
     justifyContent: "center",
   },
-  fotoEmoji: {
-    fontSize: 36,
+  fotoImage: {
+    width: 48,
+    height: 48,
   },
   fotoLabel: {
     fontSize: 12,
     color: "#444",
   },
   button: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     paddingVertical: 14,
     borderRadius: 999,
     alignItems: "center",
@@ -204,6 +218,6 @@ const styles = StyleSheet.create({
   },
   bottomSheet: {
     height: 80,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
 });

@@ -7,6 +7,7 @@ import {
 import { useCallback, useState } from "react";
 import {
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -16,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { getHistory, HistoryOrder } from "../store/historyStore";
+import * as WebBrowser from "expo-web-browser";
 
 export default function History() {
   const { namaToko } = useLocalSearchParams();
@@ -43,9 +45,25 @@ export default function History() {
   };
 
   const metodeIcon = (metode: string) => {
-    if (metode === "QRIS") return "📱";
-    if (metode === "Cash") return "💵";
-    return "💳";
+    if (metode === "QRIS") {
+      return (
+        <Image
+          source={require("../../assets/images/Qr.png")}
+          style={{ width: 14, height: 14, marginRight: 4 }}
+          resizeMode="contain"
+        />
+      );
+    }
+    if (metode === "Cash") {
+      return (
+        <Image
+          source={require("../../assets/images/Cash.png")}
+          style={{ width: 14, height: 14, marginRight: 4 }}
+          resizeMode="contain"
+        />
+      );
+    }
+    return <Text style={{ fontSize: 12, marginRight: 4 }}>💳</Text>;
   };
 
   const renderCard = ({
@@ -67,10 +85,14 @@ export default function History() {
         {/* Top row */}
         <View style={styles.cardTop}>
           <View style={styles.badgeRow}>
-            <View style={styles.metodeBadge}>
-              <Text style={styles.metodeBadgeText}>
-                {metodeIcon(item.metodeBayar)} {item.metodeBayar}
-              </Text>
+            <View
+              style={[
+                styles.metodeBadge,
+                { flexDirection: "row", alignItems: "center" },
+              ]}
+            >
+              {metodeIcon(item.metodeBayar)}
+              <Text style={styles.metodeBadgeText}>{item.metodeBayar}</Text>
             </View>
             <Text style={styles.nomorStruk}>{item.nomorStruk}</Text>
           </View>
@@ -93,19 +115,59 @@ export default function History() {
     </Pressable>
   );
 
+  const handleExport = async () => {
+    if (historyList.length === 0) return;
+
+    // Buat data CSV
+    const header = "Nomor Struk,Waktu,Metode Bayar,Total Harga,Item\n";
+    const rows = historyList
+      .map((order) => {
+        const items = order.items
+          .map((i) => `${i.namaMenu} x${i.qty}`)
+          .join(" | ");
+        return `${order.nomorStruk},${order.waktu},${order.metodeBayar},${order.totalHarga},"${items}"`;
+      })
+      .join("\n");
+
+    const csvContent = header + rows;
+
+    // Encode ke base64 untuk URL
+    const encoded = encodeURIComponent(csvContent);
+
+    // Buka Google Sheets import via browser
+    const url = `https://docs.google.com/spreadsheets/d/create?usp=sharing`;
+    await WebBrowser.openBrowserAsync(url);
+  };
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* White top area */}
       <View style={styles.topArea}>
-        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>← Kembali</Text>
+          <TouchableOpacity onPress={() => router.back()} style={{ width: 40 }}>
+            <Image
+              source={require("../../assets/images/arrow-back.png")}
+              style={styles.backBtn}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
-          <Text style={styles.title}>Riwayat Pesanan</Text>
-          <View style={{ width: 70 }} />
+          <Text style={[styles.title, { flex: 1, textAlign: "center" }]}>
+            Riwayat Pesanan
+          </Text>
+          <View style={{ width: 40 }} />
+          {/* Tombol Export */}
+          <TouchableOpacity
+            style={[
+              styles.exportBtn,
+              historyList.length === 0 && styles.exportBtnDisabled,
+            ]}
+            onPress={handleExport}
+            disabled={historyList.length === 0}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.exportText}>Eksport Ke Spreadsheet</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Summary pill */}
@@ -180,9 +242,14 @@ export default function History() {
                   {selectedOrder ? formatWaktu(selectedOrder.waktu) : ""}
                 </Text>
               </View>
-              <View style={styles.detailMetodeBadge}>
+              <View
+                style={[
+                  styles.detailMetodeBadge,
+                  { flexDirection: "row", alignItems: "center" },
+                ]}
+              >
+                {selectedOrder && metodeIcon(selectedOrder.metodeBayar)}
                 <Text style={styles.detailMetodeText}>
-                  {selectedOrder ? metodeIcon(selectedOrder.metodeBayar) : ""}{" "}
                   {selectedOrder?.metodeBayar}
                 </Text>
               </View>
@@ -197,9 +264,15 @@ export default function History() {
             >
               {selectedOrder?.items.map((item) => (
                 <View key={item.id} style={styles.detailItemRow}>
-                  <Text style={styles.detailItemEmoji}>
-                    {item.kategori === "Makanan" ? "🍜" : "🥤"}
-                  </Text>
+                  <Image
+                    source={
+                      item.kategori === "Makanan"
+                        ? require("../../assets/images/Food.png")
+                        : require("../../assets/images/Drink.png")
+                    }
+                    style={{ width: 28, height: 28 }}
+                    resizeMode="contain"
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.detailItemName}>{item.namaMenu}</Text>
                     <Text style={styles.detailItemQty}>
@@ -243,7 +316,7 @@ export default function History() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
   topArea: {
     flex: 1,
@@ -260,14 +333,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backBtn: {
-    fontSize: 14,
-    color: "#1B2A4A",
-    fontWeight: "500",
+    width: 24,
+    height: 24,
   },
   title: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
 
   // Summary pill
@@ -275,7 +347,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -283,7 +355,7 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 13,
-    color: "#aab8d4",
+    color: "#ffffffff",
     fontWeight: "500",
   },
   summaryTotal: {
@@ -315,14 +387,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 16,
     overflow: "hidden",
-    shadowColor: "#1B2A4A",
+    shadowColor: "#4B2E2B",
     shadowOpacity: 0.07,
     shadowRadius: 10,
     elevation: 3,
   },
   accentBar: {
     width: 5,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
   },
@@ -350,7 +422,7 @@ const styles = StyleSheet.create({
   metodeBadgeText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   nomorStruk: {
     fontSize: 11,
@@ -359,7 +431,7 @@ const styles = StyleSheet.create({
   cardTotal: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   itemsPreview: {
     fontSize: 12,
@@ -377,7 +449,7 @@ const styles = StyleSheet.create({
   },
   detailHint: {
     fontSize: 11,
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     fontWeight: "600",
   },
 
@@ -388,7 +460,7 @@ const styles = StyleSheet.create({
   },
   bottomBarText: {
     fontSize: 13,
-    color: "#4a6080",
+    color: "#ffffffff",
     fontWeight: "500",
   },
 
@@ -430,7 +502,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   detailMetodeBadge: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -456,7 +528,7 @@ const styles = StyleSheet.create({
   detailItemName: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   detailItemQty: {
     fontSize: 12,
@@ -466,7 +538,7 @@ const styles = StyleSheet.create({
   detailItemTotal: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   detailTotalRow: {
     flexDirection: "row",
@@ -477,16 +549,16 @@ const styles = StyleSheet.create({
   detailTotalLabel: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     letterSpacing: 0.8,
   },
   detailTotalValue: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   tutupBtn: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     paddingVertical: 15,
     borderRadius: 999,
     alignItems: "center",

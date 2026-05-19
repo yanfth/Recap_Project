@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     textAlign: "center",
     marginBottom: 8,
   },
@@ -101,13 +101,13 @@ const styles = StyleSheet.create({
   },
   input: {
     borderBottomWidth: 1.5,
-    borderBottomColor: "#1B2A4A",
+    borderBottomColor: "#4B2E2B",
     paddingVertical: 8,
     fontSize: 15,
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   button: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     paddingVertical: 14,
     borderRadius: 999,
     alignItems: "center",
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   bottomSheet: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 32,
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   recapSubtitle: {
     fontSize: 13,
-    color: "#aab8d4",
+    color: "#fff",
     textAlign: "center",
   },
   bold: {

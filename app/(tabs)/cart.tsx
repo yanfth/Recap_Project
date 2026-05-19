@@ -7,6 +7,7 @@ import {
 import { useCallback, useState } from "react";
 import {
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -72,19 +73,17 @@ export default function Cart() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Area putih */}
       <View style={styles.topArea}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            {/* <img
+            <Image
+              source={require("../../assets/images/arrow-back.png")}
               style={styles.backBtn}
-              src="../../assets/images/arrowleft.png"
-              alt=""
-            /> */}
-            <Text style={styles.backBtn}>← Kembali</Text>
+              resizeMode="contain"
+            />
           </TouchableOpacity>
           <Text style={styles.title}>Keranjang</Text>
-          <View style={{ width: 60 }} />
+          <View style={{ width: 24 }} />
         </View>
 
         {cartList.length === 0 ? (
@@ -108,7 +107,6 @@ export default function Cart() {
         )}
       </View>
 
-      {/* Area biru bawah */}
       <View style={styles.bottomSheet}>
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total Pesanan</Text>
@@ -135,7 +133,7 @@ export default function Cart() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
   },
   topArea: {
     flex: 1,
@@ -152,14 +150,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   backBtn: {
-    fontSize: 14,
-    color: "#1B2A4A",
-    fontWeight: "500",
+    width: 24,
+    height: 24,
   },
   title: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   emptyArea: {
     flex: 1,
@@ -202,7 +199,7 @@ const styles = StyleSheet.create({
   cardName: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
   },
   cardHarga: {
     fontSize: 12,
@@ -211,7 +208,7 @@ const styles = StyleSheet.create({
   cardTotal: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     marginTop: 2,
   },
   hapusBtn: {
@@ -221,7 +218,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fee2e2",
     alignItems: "center",
     justifyContent: "center",
-    cursor: "pointer",
   },
   hapusText: {
     color: "#e74c3c",
@@ -229,7 +225,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   bottomSheet: {
-    backgroundColor: "#1B2A4A",
+    backgroundColor: "#4B2E2B",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 28,
@@ -243,7 +239,7 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 16,
-    color: "#aab8d4",
+    color: "#fff",
     fontWeight: "500",
   },
   totalHarga: {
@@ -258,10 +254,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   bayarBtnDisabled: {
-    backgroundColor: "#4a5e7a",
+    backgroundColor: "#ffffff",
   },
   bayarText: {
-    color: "#1B2A4A",
+    color: "#4B2E2B",
     fontSize: 16,
     fontWeight: "600",
   },
