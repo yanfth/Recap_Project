@@ -4,20 +4,42 @@ import {
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
+import * as Sharing from "expo-sharing";
 import { useCallback, useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import * as XLSX from "xlsx";
 import { getHistory, HistoryOrder } from "../store/historyStore";
+
+// ✅ Definisikan interface manual agar TypeScript tidak error
+// saat FileSystem di-require secara kondisional
+interface IFileSystem {
+  cacheDirectory: string | null;
+  writeAsStringAsync: (
+    fileUri: string,
+    contents: string,
+    options?: { encoding?: string },
+  ) => Promise<void>;
+  EncodingType: {
+    Base64: string;
+    UTF8: string;
+  };
+}
+
+// ✅ Hanya di-require di Android/iOS, bukan di web
+const FileSystem: IFileSystem | null =
+  Platform.OS !== "web" ? require("expo-file-system") : null;
 
 export default function History() {
   const { namaToko } = useLocalSearchParams();
@@ -65,39 +87,128 @@ export default function History() {
     return <Text style={{ fontSize: 12, marginRight: 4 }}>💳</Text>;
   };
 
-  // ✅ FIXED: Ganti WebBrowser (tidak perlu) → pakai Share bawaan React Native
-  const handleExport = async () => {
-    if (historyList.length === 0) return;
-
-    const header = "Nomor Struk,Waktu,Metode Bayar,Total Harga,Item\n";
-    const rows = historyList
-      .map((order) => {
-        const items = order.items
-          .map((i) => `${i.namaMenu} x${i.qty}`)
-          .join(" | ");
-        return `${order.nomorStruk},${order.waktu},${order.metodeBayar},${order.totalHarga},"${items}"`;
-      })
-      .join("\n");
-
-    const csvContent = header + rows;
-
-    try {
-      await Share.share({
-        title: `Riwayat Pesanan - ${namaToko}`,
-        message: csvContent,
+  // Susun data tabel (dipakai web & native)
+  const buildTableData = () => {
+    const tableData: Record<string, string | number>[] = [];
+    historyList.forEach((order) => {
+      const tanggal = new Date(order.waktu);
+      const tglStr = tanggal.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
       });
+      const jamStr = tanggal.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      order.items.forEach((item) => {
+        const hargaNum =
+          typeof item.harga === "number"
+            ? item.harga
+            : parseInt(String(item.harga), 10) || 0;
+        tableData.push({
+          "Nomor Struk": order.nomorStruk,
+          Tanggal: tglStr,
+          Jam: jamStr,
+          "Metode Bayar": order.metodeBayar,
+          "Nama Menu": item.namaMenu,
+          Kategori: item.kategori ?? "-",
+          "Harga Satuan": hargaNum,
+          Qty: item.qty,
+          Subtotal: hargaNum * item.qty,
+          "Total Transaksi": order.totalHarga,
+        });
+      });
+    });
+    return tableData;
+  };
+
+  // Buat workbook xlsx
+  const buildWorkbook = () => {
+    const tableData = buildTableData();
+    const ws = XLSX.utils.json_to_sheet(tableData);
+    ws["!cols"] = [
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 8 },
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 6 },
+      { wch: 14 },
+      { wch: 16 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Riwayat Pesanan");
+    return wb;
+  };
+
+  // Export WEB — download langsung via browser
+  const handleExportWeb = () => {
+    try {
+      const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
+      const wb = buildWorkbook();
+      XLSX.writeFile(wb, `Riwayat_${tokoName}_${Date.now()}.xlsx`);
     } catch (error) {
-      console.error("Gagal export:", error);
+      console.error("Gagal export web:", error);
+      alert("Terjadi kesalahan saat mengekspor data.");
     }
   };
 
-  const renderCard = ({
-    item,
-    index,
-  }: {
-    item: HistoryOrder;
-    index: number;
-  }) => (
+  // Export NATIVE (Android/iOS) — simpan ke cache lalu share
+  const handleExportNative = async () => {
+    if (!FileSystem) return;
+
+    try {
+      const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
+      const wb = buildWorkbook();
+
+      // Tulis ke base64
+      const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
+
+      // Simpan ke cache
+      const cacheDir = FileSystem.cacheDirectory ?? "";
+      if (!cacheDir) {
+        Alert.alert("Error", "Tidak menemukan direktori cache.");
+        return;
+      }
+      const fileName = `Riwayat_${tokoName}_${Date.now()}.xlsx`;
+      const filePath = `${cacheDir}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(filePath, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Bagikan file
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert("Error", "Fitur berbagi tidak tersedia di perangkat ini.");
+        return;
+      }
+      await Sharing.shareAsync(filePath, {
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        dialogTitle: `Ekspor Riwayat - ${tokoName}`,
+        UTI: "com.microsoft.excel.xlsx",
+      });
+    } catch (error) {
+      console.error("Gagal export native:", error);
+      Alert.alert("Gagal", "Terjadi kesalahan saat mengekspor data.");
+    }
+  };
+
+  // Handler utama — otomatis pilih web atau native
+  const handleExport = () => {
+    if (historyList.length === 0) return;
+    if (Platform.OS === "web") {
+      handleExportWeb();
+    } else {
+      handleExportNative();
+    }
+  };
+
+  const renderCard = ({ item }: { item: HistoryOrder }) => (
     <Pressable
       style={styles.card}
       onPress={() => setSelectedOrder(item)}
@@ -140,7 +251,6 @@ export default function History() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topArea}>
-        {/* ✅ FIXED: Header layout diperbaiki — export button di kanan, tidak di bawah */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={{ width: 40 }}>
             <Image
@@ -163,7 +273,6 @@ export default function History() {
           </TouchableOpacity>
         </View>
 
-        {/* Summary pill */}
         {historyList.length > 0 && (
           <View style={styles.summaryPill}>
             <Text style={styles.summaryText}>
@@ -178,7 +287,6 @@ export default function History() {
           </View>
         )}
 
-        {/* List */}
         {historyList.length === 0 ? (
           <View style={styles.emptyArea}>
             <Text style={styles.emptyIcon}>🧾</Text>
@@ -201,7 +309,6 @@ export default function History() {
         )}
       </View>
 
-      {/* Dark bottom bar */}
       <View style={styles.bottomBar}>
         <Text style={styles.bottomBarText}>
           {historyList.length > 0
@@ -210,7 +317,6 @@ export default function History() {
         </Text>
       </View>
 
-      {/* ===== DETAIL MODAL ===== */}
       <Modal
         visible={!!selectedOrder}
         animationType="slide"
@@ -252,30 +358,34 @@ export default function History() {
               style={{ maxHeight: 220 }}
               showsVerticalScrollIndicator={false}
             >
-              {selectedOrder?.items.map((item) => (
-                <View key={item.id} style={styles.detailItemRow}>
-                  <Image
-                    source={
-                      item.kategori === "Makanan"
-                        ? require("../../assets/images/Food.png")
-                        : require("../../assets/images/Drink.png")
-                    }
-                    style={{ width: 28, height: 28 }}
-                    resizeMode="contain"
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.detailItemName}>{item.namaMenu}</Text>
-                    <Text style={styles.detailItemQty}>
-                      Rp {parseInt(item.harga).toLocaleString("id-ID")} ×{" "}
-                      {item.qty}
+              {selectedOrder?.items.map((item) => {
+                const hargaNum =
+                  typeof item.harga === "number"
+                    ? item.harga
+                    : parseInt(String(item.harga), 10) || 0;
+                return (
+                  <View key={item.id} style={styles.detailItemRow}>
+                    <Image
+                      source={
+                        item.kategori === "Makanan"
+                          ? require("../../assets/images/Food.png")
+                          : require("../../assets/images/Drink.png")
+                      }
+                      style={{ width: 28, height: 28 }}
+                      resizeMode="contain"
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.detailItemName}>{item.namaMenu}</Text>
+                      <Text style={styles.detailItemQty}>
+                        Rp {hargaNum.toLocaleString("id-ID")} × {item.qty}
+                      </Text>
+                    </View>
+                    <Text style={styles.detailItemTotal}>
+                      Rp {(hargaNum * item.qty).toLocaleString("id-ID")}
                     </Text>
                   </View>
-                  <Text style={styles.detailItemTotal}>
-                    Rp{" "}
-                    {(parseInt(item.harga) * item.qty).toLocaleString("id-ID")}
-                  </Text>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
 
             <View style={styles.dashedLine} />
@@ -302,10 +412,7 @@ export default function History() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#4B2E2B",
-  },
+  container: { flex: 1, backgroundColor: "#4B2E2B" },
   topArea: {
     flex: 1,
     backgroundColor: "#fff",
@@ -320,10 +427,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
   },
-  backBtn: {
-    width: 24,
-    height: 24,
-  },
+  backBtn: { width: 24, height: 24 },
   title: {
     fontSize: 18,
     fontWeight: "bold",
@@ -331,7 +435,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  // ✅ FIXED: Export button kecil di header (bukan paddingVertical: 16)
   exportBtn: {
     backgroundColor: "#4B2E2B",
     paddingVertical: 7,
@@ -339,14 +442,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
   },
-  exportBtnDisabled: {
-    backgroundColor: "#ccc",
-  },
-  exportText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
+  exportBtnDisabled: { backgroundColor: "#ccc" },
+  exportText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   summaryPill: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -357,16 +454,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 4,
   },
-  summaryText: {
-    fontSize: 13,
-    color: "#ffffff",
-    fontWeight: "500",
-  },
-  summaryTotal: {
-    fontSize: 14,
-    color: "#fff",
-    fontWeight: "700",
-  },
+  summaryText: { fontSize: 13, color: "#ffffff", fontWeight: "500" },
+  summaryTotal: { fontSize: 14, color: "#fff", fontWeight: "700" },
   emptyArea: {
     flex: 1,
     alignItems: "center",
@@ -396,38 +485,22 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
   },
-  cardContent: {
-    flex: 1,
-    padding: 14,
-    gap: 6,
-  },
+  cardContent: { flex: 1, padding: 14, gap: 6 },
   cardTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  badgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+  badgeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   metodeBadge: {
     backgroundColor: "#f3eeee",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
-  metodeBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#4B2E2B",
-  },
+  metodeBadgeText: { fontSize: 11, fontWeight: "600", color: "#4B2E2B" },
   nomorStruk: { fontSize: 11, color: "#bbb" },
-  cardTotal: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#4B2E2B",
-  },
+  cardTotal: { fontSize: 15, fontWeight: "700", color: "#4B2E2B" },
   itemsPreview: { fontSize: 12, color: "#888" },
   cardBottom: {
     flexDirection: "row",
@@ -436,20 +509,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   waktuText: { fontSize: 11, color: "#aaa" },
-  detailHint: {
-    fontSize: 11,
-    color: "#4B2E2B",
-    fontWeight: "600",
-  },
-  bottomBar: {
-    paddingVertical: 18,
-    alignItems: "center",
-  },
-  bottomBarText: {
-    fontSize: 13,
-    color: "#ffffff",
-    fontWeight: "500",
-  },
+  detailHint: { fontSize: 11, color: "#4B2E2B", fontWeight: "600" },
+  bottomBar: { paddingVertical: 18, alignItems: "center" },
+  bottomBarText: { fontSize: 13, color: "#ffffff", fontWeight: "500" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -476,11 +538,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 4,
   },
-  detailNomor: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#4B2E2B",
-  },
+  detailNomor: { fontSize: 16, fontWeight: "700", color: "#4B2E2B" },
   detailWaktu: { fontSize: 12, color: "#aaa", marginTop: 3 },
   detailMetodeBadge: {
     backgroundColor: "#4B2E2B",
@@ -488,11 +546,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
-  detailMetodeText: {
-    fontSize: 12,
-    color: "#fff",
-    fontWeight: "600",
-  },
+  detailMetodeText: { fontSize: 12, color: "#fff", fontWeight: "600" },
   dashedLine: {
     borderStyle: "dashed",
     borderWidth: 1,
@@ -505,17 +559,9 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 10,
   },
-  detailItemName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4B2E2B",
-  },
+  detailItemName: { fontSize: 14, fontWeight: "600", color: "#4B2E2B" },
   detailItemQty: { fontSize: 12, color: "#aaa", marginTop: 1 },
-  detailItemTotal: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#4B2E2B",
-  },
+  detailItemTotal: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
   detailTotalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -528,11 +574,7 @@ const styles = StyleSheet.create({
     color: "#4B2E2B",
     letterSpacing: 0.8,
   },
-  detailTotalValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#4B2E2B",
-  },
+  detailTotalValue: { fontSize: 18, fontWeight: "bold", color: "#4B2E2B" },
   tutupBtn: {
     backgroundColor: "#4B2E2B",
     paddingVertical: 15,
