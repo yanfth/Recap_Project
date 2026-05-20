@@ -6,17 +6,20 @@ import {
 } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   FlatList,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { addToCart, getTotalQty } from "../store/cartStore";
-import { getMenuList } from "../store/menuStore";
+import { deleteMenuItem, editMenuItem, getMenuList } from "../store/menuStore";
 
 type MenuItem = {
   id: string;
@@ -33,6 +36,17 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("Semua");
   const [totalCart, setTotalCart] = useState(0);
   const [showPopup, setShowPopup] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // State untuk edit menu
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [editNama, setEditNama] = useState("");
+  const [editHarga, setEditHarga] = useState("");
+  const [editKategori, setEditKategori] = useState<"Makanan" | "Minuman">(
+    "Makanan",
+  );
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const popupOpacity = useRef(new Animated.Value(0)).current;
@@ -45,6 +59,7 @@ export default function Dashboard() {
     }, []),
   );
 
+  // ─── Popup animasi "item di keranjang" ───────────────────────────────────────
   const triggerPopup = () => {
     popupOpacity.setValue(0);
     popupTranslateY.setValue(20);
@@ -80,52 +95,142 @@ export default function Dashboard() {
     });
   };
 
+  // ─── Handler ─────────────────────────────────────────────────────────────────
   const handleAddToCart = (item: MenuItem) => {
     addToCart(item);
-    const newTotal = getTotalQty();
-    setTotalCart(newTotal);
+    setTotalCart(getTotalQty());
     triggerPopup();
   };
 
-  const filteredMenu =
-    activeTab === "Semua"
-      ? menuList
-      : menuList.filter((m) => m.kategori === activeTab);
+  const handleEdit = (item: MenuItem) => {
+    setEditingItem(item);
+    setEditNama(item.namaMenu);
+    setEditHarga(item.harga);
+    setEditKategori(item.kategori as "Makanan" | "Minuman");
+    setShowEditModal(true);
+  };
+
+  const handleDelete = (item: MenuItem) => {
+    setActiveMenuId(null); // Tutup dropdown
+    Alert.alert("Hapus Menu", `Yakin ingin menghapus "${item.namaMenu}"?`, [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus",
+        style: "destructive",
+        onPress: () => {
+          deleteMenuItem(item.id);
+          const updatedList = getMenuList();
+          setMenuList(updatedList);
+        },
+      },
+    ]);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingItem) return;
+    if (!editNama.trim() || !editHarga.trim()) {
+      Alert.alert("Error", "Nama dan harga harus diisi");
+      return;
+    }
+    editMenuItem(editingItem.id, {
+      namaMenu: editNama.trim(),
+      harga: editHarga.trim(),
+      kategori: editKategori,
+    });
+    setMenuList(getMenuList());
+    setShowEditModal(false);
+    setEditingItem(null);
+  };
+
+  // ─── Filter & misc ────────────────────────────────────────────────────────────
+  const filteredMenu = menuList
+    .filter((m) => activeTab === "Semua" || m.kategori === activeTab)
+    .filter((m) =>
+      m.namaMenu.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
 
   const onPressIn = () =>
     Animated.spring(scaleAnim, { toValue: 0.9, useNativeDriver: true }).start();
-
   const onPressOut = () =>
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
 
-  const renderMenu = ({ item }: { item: MenuItem }) => (
-    <View style={styles.menuCard}>
-      <View style={styles.menuImageBox}>
-        <Image
-          source={
-            item.kategori === "Makanan"
-              ? require("../../assets/images/Food.png")
-              : require("../../assets/images/Drink.png")
-          }
-          style={styles.menuCategoryIcon}
-        />
-      </View>
-      <View style={styles.menuInfo}>
-        <Text style={styles.menuName}>{item.namaMenu}</Text>
-        <Text style={styles.menuKal}>Menu Tersedia</Text>
-        <Text style={styles.menuHarga}>
-          Rp {parseInt(item.harga).toLocaleString("id-ID")}
-        </Text>
-      </View>
-      <Pressable
-        style={styles.menuAddBtn}
-        onPress={() => handleAddToCart(item)}
-      >
-        <Text style={styles.menuAddText}>+</Text>
-      </Pressable>
-    </View>
-  );
+  // ─── Render card menu ─────────────────────────────────────────────────────────
+  const renderMenu = ({ item }: { item: MenuItem }) => {
+    const isOpen = activeMenuId === item.id;
 
+    return (
+      <View style={styles.menuCard}>
+        {/* Gambar kategori */}
+        <View style={styles.menuImageBox}>
+          <Image
+            source={
+              item.kategori === "Makanan"
+                ? require("../../assets/images/Food.png")
+                : require("../../assets/images/Drink.png")
+            }
+            style={styles.menuCategoryIcon}
+          />
+        </View>
+
+        {/* Info menu */}
+        <View style={styles.menuInfo}>
+          <Text style={styles.menuName}>{item.namaMenu}</Text>
+          <Text style={styles.menuKal}>Menu Tersedia</Text>
+          <Text style={styles.menuHarga}>
+            Rp {parseInt(item.harga).toLocaleString("id-ID")}
+          </Text>
+        </View>
+
+        {/* Kolom kanan: titik tiga + tombol tambah */}
+        <View style={styles.cardRight}>
+          {/* Tombol titik tiga */}
+          <View>
+            <TouchableOpacity
+              style={styles.dotsBtn}
+              onPress={() => setActiveMenuId(isOpen ? null : item.id)}
+            >
+              <Text style={styles.dotsText}>⋮</Text>
+            </TouchableOpacity>
+
+            {/* Dropdown muncul saat titik tiga ditekan */}
+            {isOpen && (
+              <View style={styles.dropdown}>
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setActiveMenuId(null);
+                    handleEdit(item);
+                  }}
+                >
+                  <Text style={styles.dropdownEdit}>✏️ Edit</Text>
+                </TouchableOpacity>
+                <View style={styles.dropdownDivider} />
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setActiveMenuId(null);
+                    handleDelete(item);
+                  }}
+                >
+                  <Text style={styles.dropdownDelete}>🗑️ Hapus</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* Tombol tambah ke keranjang */}
+          <Pressable
+            style={styles.menuAddBtn}
+            onPress={() => handleAddToCart(item)}
+          >
+            <Text style={styles.menuAddText}>+</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  // ─── UI ───────────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -153,6 +258,23 @@ export default function Dashboard() {
           ))}
         </View>
 
+        {/* Search bar */}
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cari menu..."
+            placeholderTextColor="#bbb"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Text style={styles.searchClear}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Daftar menu atau placeholder kosong */}
         {filteredMenu.length === 0 ? (
           <View style={styles.emptyArea}>
@@ -171,6 +293,7 @@ export default function Dashboard() {
               paddingBottom: 100,
             }}
             showsVerticalScrollIndicator={false}
+            style={{ overflow: "visible" }}
           />
         )}
       </View>
@@ -241,6 +364,75 @@ export default function Dashboard() {
           />
         </TouchableOpacity>
       </View>
+
+      {/* Modal Edit Menu */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowEditModal(false)}
+        >
+          <Pressable style={styles.editBox} onPress={() => {}}>
+            <Text style={styles.editTitle}>Edit Menu</Text>
+
+            <Text style={styles.label}>Nama Menu</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nama menu"
+              value={editNama}
+              onChangeText={setEditNama}
+            />
+
+            <Text style={styles.label}>Harga</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Harga"
+              keyboardType="numeric"
+              value={editHarga}
+              onChangeText={setEditHarga}
+            />
+
+            <Text style={styles.label}>Kategori</Text>
+            <View style={styles.kategoriRow}>
+              {(["Makanan", "Minuman"] as const).map((kat) => (
+                <TouchableOpacity
+                  key={kat}
+                  style={[
+                    styles.kategoriBtn,
+                    editKategori === kat && styles.kategoriBtnActive,
+                  ]}
+                  onPress={() => setEditKategori(kat)}
+                >
+                  <Text
+                    style={[
+                      styles.kategoriText,
+                      editKategori === kat && styles.kategoriTextActive,
+                    ]}
+                  >
+                    {kat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowEditModal(false)}
+              >
+                <Text style={styles.cancelText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}>
+                <Text style={styles.saveText}>Simpan</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -297,6 +489,38 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 26,
   },
+
+  // ─── Search Bar ──────────────────────────────────────────────────────────────
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "#ebebeb",
+    gap: 8,
+  },
+  searchIcon: {
+    fontSize: 16,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#4B2E2B",
+    paddingVertical: 0,
+  },
+  searchClear: {
+    fontSize: 14,
+    color: "#bbb",
+    fontWeight: "600",
+    paddingLeft: 4,
+  },
+
+  // ─── Menu Card ───────────────────────────────────────────────────────────────
   menuCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -308,6 +532,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 3,
+    overflow: "visible",
   },
   menuImageBox: {
     width: 70,
@@ -341,6 +566,68 @@ const styles = StyleSheet.create({
     color: "#4B2E2B",
     marginTop: 4,
   },
+
+  // Kolom kanan card
+  cardRight: {
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    overflow: "visible",
+    zIndex: 10,
+  },
+
+  // Tombol titik tiga
+  dotsBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f2f2f2",
+  },
+  dotsText: {
+    fontSize: 18,
+    color: "#4B2E2B",
+    lineHeight: 20,
+  },
+
+  // Dropdown menu
+  dropdown: {
+    position: "absolute",
+    top: 0,
+    right: 36,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingVertical: 4,
+    minWidth: 120,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 20,
+    zIndex: 9999,
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
+  },
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  dropdownEdit: {
+    fontSize: 13,
+    color: "#E65100",
+    fontWeight: "600",
+  },
+  dropdownDelete: {
+    fontSize: 13,
+    color: "#C62828",
+    fontWeight: "600",
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: "#f0f0f0",
+    marginHorizontal: 8,
+  },
+
   menuAddBtn: {
     width: 32,
     height: 32,
@@ -354,6 +641,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
   },
+
+  // ─── FAB ─────────────────────────────────────────────────────────────────────
   fabWrap: {
     position: "absolute",
     bottom: 90,
@@ -377,6 +666,8 @@ const styles = StyleSheet.create({
     fontSize: 28,
     lineHeight: 32,
   },
+
+  // ─── Popup ───────────────────────────────────────────────────────────────────
   popup: {
     position: "absolute",
     bottom: 90,
@@ -398,6 +689,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
+
+  // ─── Bottom Nav ──────────────────────────────────────────────────────────────
   bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -423,5 +716,95 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 11,
     fontWeight: "bold",
+  },
+
+  // ─── Modal Edit ──────────────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editBox: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "85%",
+    maxWidth: 400,
+  },
+  editTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#4B2E2B",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4B2E2B",
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  input: {
+    backgroundColor: "#f9f9f9",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    color: "#4B2E2B",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  kategoriRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+  },
+  kategoriBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#f2f2f2",
+    alignItems: "center",
+  },
+  kategoriBtnActive: {
+    backgroundColor: "#4B2E2B",
+  },
+  kategoriText: {
+    fontSize: 14,
+    color: "#888",
+    fontWeight: "500",
+  },
+  kategoriTextActive: {
+    color: "#fff",
+  },
+  editActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#f2f2f2",
+    alignItems: "center",
+  },
+  cancelText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#888",
+  },
+  saveBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#4B2E2B",
+    alignItems: "center",
+  },
+  saveText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
   },
 });

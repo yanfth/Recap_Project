@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import * as XLSX from "xlsx";
 import { getHistory, HistoryOrder } from "../store/historyStore";
+import { loadKas, resetKas, saveKas } from "../store/kasStore";
 
 // ✅ Interface FileSystem agar TypeScript tidak error
 interface IFileSystem {
@@ -45,14 +46,19 @@ export default function History() {
   const [selectedOrder, setSelectedOrder] = useState<HistoryOrder | null>(null);
 
   // ===== STATE KAS =====
-  const [modalAwal, setModalAwal] = useState<number>(0); // modal yang diisi user
-  const [showKasModal, setShowKasModal] = useState(false); // modal input kas
-  const [inputModal, setInputModal] = useState(""); // nilai sementara di TextInput
-  const [kasDisimpan, setKasDisimpan] = useState(false); // sudah diisi atau belum
+  const [modalAwal, setModalAwal] = useState<number>(0);
+  const [showKasModal, setShowKasModal] = useState(false);
+  const [inputModal, setInputModal] = useState("");
+  const [kasDisimpan, setKasDisimpan] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       setHistoryList(getHistory());
+      // Load kas dari AsyncStorage setiap kali halaman difokus
+      loadKas().then(({ modalAwal: saved, kasDisimpan: isSaved }) => {
+        setModalAwal(saved);
+        setKasDisimpan(isSaved);
+      });
     }, []),
   );
 
@@ -64,12 +70,13 @@ export default function History() {
 
   const formatRp = (val: number) => `Rp ${val.toLocaleString("id-ID")}`;
 
-  const handleSimpanModal = () => {
+  const handleSimpanModal = async () => {
     const parsed = parseInt(inputModal.replace(/\D/g, ""), 10);
     if (isNaN(parsed) || parsed < 0) {
       Alert.alert("Input tidak valid", "Masukkan nominal yang benar.");
       return;
     }
+    await saveKas(parsed);
     setModalAwal(parsed);
     setKasDisimpan(true);
     setShowKasModal(false);
@@ -85,7 +92,8 @@ export default function History() {
         {
           text: "Reset",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
+            await resetKas();
             setModalAwal(0);
             setKasDisimpan(false);
           },

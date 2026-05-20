@@ -246,7 +246,13 @@ export default function Payment() {
           <View style={styles.strukBox}>
             {/* Header Struk */}
             <View style={styles.strukHeader}>
-              <Text style={styles.checkmark}>✓</Text>
+              <View style={styles.checkmarkCircle}>
+                <Image
+                  source={require("../../assets/images/Check.png")}
+                  style={styles.checkmarkIcon}
+                  resizeMode="contain"
+                />
+              </View>
               <Text style={styles.strukSuccessText}>Pembayaran Berhasil!</Text>
               <Text style={styles.strukSubText}>
                 Terima kasih telah memesan
@@ -478,7 +484,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  bottomLabel: { fontSize: 15, color: "#aab8d4", fontWeight: "500" },
+  bottomLabel: { fontSize: 15, color: "#ffffffff", fontWeight: "500" },
   bottomHarga: { fontSize: 20, color: "#fff", fontWeight: "bold" },
   bayarBtn: {
     backgroundColor: "#fff",
@@ -486,9 +492,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
   },
-  bayarBtnDisabled: { backgroundColor: "#444141ff" },
+  bayarBtnDisabled: { backgroundColor: "#2a2323ff" },
   bayarText: { color: "#4B2E2B", fontSize: 16, fontWeight: "600" },
-  bayarTextDisabled: { color: "#8a9ab5" },
+  bayarTextDisabled: { color: "#ffffffff" },
 
   // ===== STRUK MODAL =====
   modalOverlay: {
@@ -507,17 +513,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  checkmark: {
-    fontSize: 44,
-    color: "#4B2E2B",
-    backgroundColor: "#e8ecf4",
+  checkmarkCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    textAlign: "center",
-    lineHeight: 72,
+    backgroundColor: "#e8ecf4",
     marginBottom: 10,
-    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkmarkIcon: {
+    width: 48,
+    height: 48,
   },
   strukSuccessText: {
     fontSize: 20,
