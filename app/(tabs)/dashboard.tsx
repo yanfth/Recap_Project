@@ -101,9 +101,14 @@ export default function Dashboard() {
   const renderMenu = ({ item }: { item: MenuItem }) => (
     <View style={styles.menuCard}>
       <View style={styles.menuImageBox}>
-        <Text style={styles.menuEmoji}>
-          {item.kategori === "Makanan" ? "🍜" : "🥤"}
-        </Text>
+        <Image
+          source={
+            item.kategori === "Makanan"
+              ? require("../../assets/images/Food.png")
+              : require("../../assets/images/Drink.png")
+          }
+          style={styles.menuCategoryIcon}
+        />
       </View>
       <View style={styles.menuInfo}>
         <Text style={styles.menuName}>{item.namaMenu}</Text>
@@ -312,8 +317,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  menuEmoji: {
-    fontSize: 36,
+  menuCategoryIcon: {
+    width: 44,
+    height: 44,
+    resizeMode: "contain",
   },
   menuInfo: {
     flex: 1,

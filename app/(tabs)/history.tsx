@@ -10,20 +10,21 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import * as XLSX from "xlsx";
 import { getHistory, HistoryOrder } from "../store/historyStore";
 
-// ✅ Definisikan interface manual agar TypeScript tidak error
-// saat FileSystem di-require secara kondisional
+// ✅ Interface FileSystem agar TypeScript tidak error
 interface IFileSystem {
   cacheDirectory: string | null;
   writeAsStringAsync: (
@@ -31,13 +32,8 @@ interface IFileSystem {
     contents: string,
     options?: { encoding?: string },
   ) => Promise<void>;
-  EncodingType: {
-    Base64: string;
-    UTF8: string;
-  };
+  EncodingType: { Base64: string; UTF8: string };
 }
-
-// ✅ Hanya di-require di Android/iOS, bukan di web
 const FileSystem: IFileSystem | null =
   Platform.OS !== "web" ? require("expo-file-system") : null;
 
@@ -48,11 +44,55 @@ export default function History() {
   const [historyList, setHistoryList] = useState<HistoryOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<HistoryOrder | null>(null);
 
+  // ===== STATE KAS =====
+  const [modalAwal, setModalAwal] = useState<number>(0); // modal yang diisi user
+  const [showKasModal, setShowKasModal] = useState(false); // modal input kas
+  const [inputModal, setInputModal] = useState(""); // nilai sementara di TextInput
+  const [kasDisimpan, setKasDisimpan] = useState(false); // sudah diisi atau belum
+
   useFocusEffect(
     useCallback(() => {
       setHistoryList(getHistory());
     }, []),
   );
+
+  // Total pemasukan dari semua transaksi
+  const totalPemasukan = historyList.reduce((acc, o) => acc + o.totalHarga, 0);
+
+  // Saldo kas = modal awal + semua pemasukan
+  const saldoKas = modalAwal + totalPemasukan;
+
+  const formatRp = (val: number) => `Rp ${val.toLocaleString("id-ID")}`;
+
+  const handleSimpanModal = () => {
+    const parsed = parseInt(inputModal.replace(/\D/g, ""), 10);
+    if (isNaN(parsed) || parsed < 0) {
+      Alert.alert("Input tidak valid", "Masukkan nominal yang benar.");
+      return;
+    }
+    setModalAwal(parsed);
+    setKasDisimpan(true);
+    setShowKasModal(false);
+    setInputModal("");
+  };
+
+  const handleResetKas = () => {
+    Alert.alert(
+      "Reset Kas",
+      "Apakah kamu yakin ingin mereset modal awal ke 0?",
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: () => {
+            setModalAwal(0);
+            setKasDisimpan(false);
+          },
+        },
+      ],
+    );
+  };
 
   const formatWaktu = (iso: string) => {
     const d = new Date(iso);
@@ -87,7 +127,7 @@ export default function History() {
     return <Text style={{ fontSize: 12, marginRight: 4 }}>💳</Text>;
   };
 
-  // Susun data tabel (dipakai web & native)
+  // ===== EXPORT =====
   const buildTableData = () => {
     const tableData: Record<string, string | number>[] = [];
     historyList.forEach((order) => {
@@ -123,7 +163,6 @@ export default function History() {
     return tableData;
   };
 
-  // Buat workbook xlsx
   const buildWorkbook = () => {
     const tableData = buildTableData();
     const ws = XLSX.utils.json_to_sheet(tableData);
@@ -144,7 +183,6 @@ export default function History() {
     return wb;
   };
 
-  // Export WEB — download langsung via browser
   const handleExportWeb = () => {
     try {
       const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
@@ -156,31 +194,21 @@ export default function History() {
     }
   };
 
-  // Export NATIVE (Android/iOS) — simpan ke cache lalu share
   const handleExportNative = async () => {
     if (!FileSystem) return;
-
     try {
       const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
       const wb = buildWorkbook();
-
-      // Tulis ke base64
       const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
-
-      // Simpan ke cache
       const cacheDir = FileSystem.cacheDirectory ?? "";
       if (!cacheDir) {
         Alert.alert("Error", "Tidak menemukan direktori cache.");
         return;
       }
-      const fileName = `Riwayat_${tokoName}_${Date.now()}.xlsx`;
-      const filePath = `${cacheDir}${fileName}`;
-
+      const filePath = `${cacheDir}Riwayat_${tokoName}_${Date.now()}.xlsx`;
       await FileSystem.writeAsStringAsync(filePath, base64, {
         encoding: FileSystem.EncodingType.Base64,
       });
-
-      // Bagikan file
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) {
         Alert.alert("Error", "Fitur berbagi tidak tersedia di perangkat ini.");
@@ -198,14 +226,9 @@ export default function History() {
     }
   };
 
-  // Handler utama — otomatis pilih web atau native
   const handleExport = () => {
     if (historyList.length === 0) return;
-    if (Platform.OS === "web") {
-      handleExportWeb();
-    } else {
-      handleExportNative();
-    }
+    Platform.OS === "web" ? handleExportWeb() : handleExportNative();
   };
 
   const renderCard = ({ item }: { item: HistoryOrder }) => (
@@ -233,11 +256,9 @@ export default function History() {
             Rp {item.totalHarga.toLocaleString("id-ID")}
           </Text>
         </View>
-
         <Text style={styles.itemsPreview} numberOfLines={1}>
           {item.items.map((i) => `${i.namaMenu} x${i.qty}`).join("  ·  ")}
         </Text>
-
         <View style={styles.cardBottom}>
           <Text style={styles.waktuText}>🕐 {formatWaktu(item.waktu)}</Text>
           <Text style={styles.detailHint}>Lihat detail →</Text>
@@ -251,6 +272,7 @@ export default function History() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topArea}>
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={{ width: 40 }}>
             <Image
@@ -273,20 +295,69 @@ export default function History() {
           </TouchableOpacity>
         </View>
 
+        {/* ===== KARTU KAS ===== */}
+        <View style={styles.kasCard}>
+          <View style={styles.kasHeader}>
+            <Text style={styles.kasTitle}>Cashbox</Text>
+            <View style={styles.kasHeaderActions}>
+              {kasDisimpan && (
+                <TouchableOpacity
+                  onPress={handleResetKas}
+                  style={styles.resetBtn}
+                >
+                  <Text style={styles.resetText}>Reset</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => {
+                  setInputModal(modalAwal > 0 ? String(modalAwal) : "");
+                  setShowKasModal(true);
+                }}
+                style={styles.editKasBtn}
+              >
+                <Text style={styles.editKasText}>
+                  {kasDisimpan ? "Ubah" : "+ Isi Modal"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.kasRows}>
+            {/* Modal Awal */}
+            <View style={styles.kasRow}>
+              <Text style={styles.kasLabel}>Modal Awal</Text>
+              <Text style={styles.kasValue}>{formatRp(modalAwal)}</Text>
+            </View>
+            {/* Pemasukan */}
+            <View style={styles.kasRow}>
+              <Text style={styles.kasLabel}>Total Pemasukan</Text>
+              <Text style={[styles.kasValue, { color: "#2e7d32" }]}>
+                + {formatRp(totalPemasukan)}
+              </Text>
+            </View>
+            {/* Divider */}
+            <View style={styles.kasDivider} />
+            {/* Saldo */}
+            <View style={styles.kasRow}>
+              <Text style={styles.kasSaldoLabel}>Cash Box</Text>
+              <Text style={styles.kasSaldoValue}>{formatRp(saldoKas)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Summary pill */}
         {historyList.length > 0 && (
           <View style={styles.summaryPill}>
             <Text style={styles.summaryText}>
               {historyList.length} pesanan selesai
             </Text>
             <Text style={styles.summaryTotal}>
-              Total: Rp{" "}
-              {historyList
-                .reduce((acc, o) => acc + o.totalHarga, 0)
-                .toLocaleString("id-ID")}
+              Total: {formatRp(totalPemasukan)}
             </Text>
           </View>
         )}
 
+        {/* List */}
         {historyList.length === 0 ? (
           <View style={styles.emptyArea}>
             <Text style={styles.emptyIcon}>🧾</Text>
@@ -309,6 +380,7 @@ export default function History() {
         )}
       </View>
 
+      {/* Bottom bar */}
       <View style={styles.bottomBar}>
         <Text style={styles.bottomBarText}>
           {historyList.length > 0
@@ -317,6 +389,64 @@ export default function History() {
         </Text>
       </View>
 
+      {/* ===== Input Modal Awal ===== */}
+      <Modal
+        visible={showKasModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowKasModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={() => setShowKasModal(false)}
+          />
+          <View style={styles.kasInputBox}>
+            <View style={styles.handleBar} />
+            <Text style={styles.kasInputTitle}>Cash Box</Text>
+            <Text style={styles.kasInputSubtitle}>
+              Masukkan jumlah uang yang tersedia di Cashbox sebelum berjualan
+            </Text>
+
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputPrefix}>Rp</Text>
+              <TextInput
+                style={styles.kasTextInput}
+                placeholder="0"
+                placeholderTextColor="#ccc"
+                keyboardType="numeric"
+                value={inputModal}
+                onChangeText={(val) => setInputModal(val.replace(/\D/g, ""))}
+                autoFocus
+              />
+            </View>
+
+            {/* Preview */}
+            {inputModal.length > 0 && (
+              <Text style={styles.inputPreview}>
+                {formatRp(parseInt(inputModal || "0", 10))}
+              </Text>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.simpanBtn,
+                inputModal.length === 0 && styles.simpanBtnDisabled,
+              ]}
+              onPress={handleSimpanModal}
+              disabled={inputModal.length === 0}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.simpanText}>Simpan</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ===== MODAL DETAIL TRANSAKSI ===== */}
       <Modal
         visible={!!selectedOrder}
         animationType="slide"
@@ -329,7 +459,6 @@ export default function History() {
         >
           <Pressable style={styles.detailBox} onPress={() => {}}>
             <View style={styles.handleBar} />
-
             <View style={styles.detailHeader}>
               <View>
                 <Text style={styles.detailNomor}>
@@ -365,15 +494,6 @@ export default function History() {
                     : parseInt(String(item.harga), 10) || 0;
                 return (
                   <View key={item.id} style={styles.detailItemRow}>
-                    <Image
-                      source={
-                        item.kategori === "Makanan"
-                          ? require("../../assets/images/Food.png")
-                          : require("../../assets/images/Drink.png")
-                      }
-                      style={{ width: 28, height: 28 }}
-                      resizeMode="contain"
-                    />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.detailItemName}>{item.namaMenu}</Text>
                       <Text style={styles.detailItemQty}>
@@ -444,6 +564,68 @@ const styles = StyleSheet.create({
   },
   exportBtnDisabled: { backgroundColor: "#ccc" },
   exportText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+
+  // ===== KAS CARD =====
+  kasCard: {
+    backgroundColor: "#fdf6f0",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: "#e8d5cc",
+  },
+  kasHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  kasTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#4B2E2B",
+  },
+  kasHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  resetBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#e74c3c",
+  },
+  resetText: {
+    fontSize: 11,
+    color: "#e74c3c",
+    fontWeight: "600",
+  },
+  editKasBtn: {
+    backgroundColor: "#4B2E2B",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  editKasText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  kasRows: { gap: 6 },
+  kasRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  kasLabel: { fontSize: 13, color: "#888" },
+  kasValue: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
+  kasDivider: {
+    height: 1,
+    backgroundColor: "#e8d5cc",
+    marginVertical: 4,
+  },
+  kasSaldoLabel: { fontSize: 14, fontWeight: "700", color: "#4B2E2B" },
+  kasSaldoValue: { fontSize: 16, fontWeight: "800", color: "#4B2E2B" },
+
+  // Summary pill
   summaryPill: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -456,6 +638,8 @@ const styles = StyleSheet.create({
   },
   summaryText: { fontSize: 13, color: "#ffffff", fontWeight: "500" },
   summaryTotal: { fontSize: 14, color: "#fff", fontWeight: "700" },
+
+  // Empty
   emptyArea: {
     flex: 1,
     alignItems: "center",
@@ -469,6 +653,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
+
+  // Card
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -510,13 +696,82 @@ const styles = StyleSheet.create({
   },
   waktuText: { fontSize: 11, color: "#aaa" },
   detailHint: { fontSize: 11, color: "#4B2E2B", fontWeight: "600" },
+
+  // Bottom bar
   bottomBar: { paddingVertical: 18, alignItems: "center" },
   bottomBarText: { fontSize: 13, color: "#ffffff", fontWeight: "500" },
+
+  // Modal overlay
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "flex-end",
   },
+
+  // ===== KAS INPUT MODAL =====
+  kasInputBox: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 28,
+    paddingBottom: 48,
+  },
+  kasInputTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#4B2E2B",
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  kasInputSubtitle: {
+    fontSize: 13,
+    color: "#aaa",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fdf6f0",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "#e8d5cc",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  inputPrefix: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#4B2E2B",
+    marginRight: 8,
+  },
+  kasTextInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#4B2E2B",
+    padding: 0,
+  },
+  inputPreview: {
+    fontSize: 13,
+    color: "#4B2E2B",
+    textAlign: "center",
+    marginBottom: 20,
+    fontWeight: "600",
+  },
+  simpanBtn: {
+    backgroundColor: "#4B2E2B",
+    paddingVertical: 16,
+    borderRadius: 999,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  simpanBtnDisabled: { backgroundColor: "#ccc" },
+  simpanText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+
+  // ===== DETAIL MODAL =====
   detailBox: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 28,
