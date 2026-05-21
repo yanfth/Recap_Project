@@ -7,7 +7,6 @@ import {
 import * as Sharing from "expo-sharing";
 import { useCallback, useState } from "react";
 import {
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -25,7 +24,6 @@ import * as XLSX from "xlsx";
 import { getHistory, HistoryOrder } from "../store/historyStore";
 import { loadKas, resetKas, saveKas } from "../store/kasStore";
 
-// ✅ Interface FileSystem agar TypeScript tidak error
 interface IFileSystem {
   cacheDirectory: string | null;
   writeAsStringAsync: (
@@ -45,37 +43,49 @@ export default function History() {
   const [historyList, setHistoryList] = useState<HistoryOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<HistoryOrder | null>(null);
 
-  // ===== STATE KAS =====
-  const [modalAwal, setModalAwal] = useState<number>(0);
+  // ─── State Kas ────────────────────────────────────────────────────────────────
+  // modalAwal = null artinya belum pernah diisi user (belum ada data valid)
+  const [modalAwal, setModalAwal] = useState<number | null>(null);
   const [showKasModal, setShowKasModal] = useState(false);
   const [inputModal, setInputModal] = useState("");
   const [kasDisimpan, setKasDisimpan] = useState(false);
 
+  // Modal konfirmasi reset (ganti Alert agar selalu berfungsi)
+  const [showResetModal, setShowResetModal] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
       setHistoryList(getHistory());
-      // Load kas dari AsyncStorage setiap kali halaman difokus
+
+      // Load kas — hanya pakai nilainya jika kasDisimpan = true
       loadKas().then(({ modalAwal: saved, kasDisimpan: isSaved }) => {
-        setModalAwal(saved);
-        setKasDisimpan(isSaved);
+        if (isSaved && saved > 0) {
+          // User memang sudah mengisi modal sebelumnya
+          setModalAwal(saved);
+          setKasDisimpan(true);
+        } else {
+          // Belum pernah diisi atau sudah di-reset
+          setModalAwal(null);
+          setKasDisimpan(false);
+        }
       });
     }, []),
   );
 
-  // Total pemasukan dari semua transaksi
+  // ─── Kalkulasi ────────────────────────────────────────────────────────────────
   const totalPemasukan = historyList.reduce((acc, o) => acc + o.totalHarga, 0);
 
-  // Saldo kas = modal awal + semua pemasukan
-  const saldoKas = modalAwal + totalPemasukan;
+  // Jika modal belum diisi, tampilkan 0 sebagai fallback visual
+  const modalAwalDisplay = modalAwal ?? 0;
+  const saldoKas = modalAwalDisplay + totalPemasukan;
 
   const formatRp = (val: number) => `Rp ${val.toLocaleString("id-ID")}`;
 
+  // ─── Handler Kas ──────────────────────────────────────────────────────────────
   const handleSimpanModal = async () => {
     const parsed = parseInt(inputModal.replace(/\D/g, ""), 10);
-    if (isNaN(parsed) || parsed < 0) {
-      Alert.alert("Input tidak valid", "Masukkan nominal yang benar.");
-      return;
-    }
+    if (isNaN(parsed) || parsed < 0) return;
+
     await saveKas(parsed);
     setModalAwal(parsed);
     setKasDisimpan(true);
@@ -83,25 +93,14 @@ export default function History() {
     setInputModal("");
   };
 
-  const handleResetKas = () => {
-    Alert.alert(
-      "Reset Kas",
-      "Apakah kamu yakin ingin mereset modal awal ke 0?",
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Reset",
-          style: "destructive",
-          onPress: async () => {
-            await resetKas();
-            setModalAwal(0);
-            setKasDisimpan(false);
-          },
-        },
-      ],
-    );
+  const confirmReset = async () => {
+    await resetKas();
+    setModalAwal(null);
+    setKasDisimpan(false);
+    setShowResetModal(false);
   };
 
+  // ─── Util ─────────────────────────────────────────────────────────────────────
   const formatWaktu = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString("id-ID", {
@@ -114,7 +113,7 @@ export default function History() {
   };
 
   const metodeIcon = (metode: string) => {
-    if (metode === "QRIS") {
+    if (metode === "QRIS")
       return (
         <Image
           source={require("../../assets/images/Qr.png")}
@@ -122,8 +121,7 @@ export default function History() {
           resizeMode="contain"
         />
       );
-    }
-    if (metode === "Cash") {
+    if (metode === "Cash")
       return (
         <Image
           source={require("../../assets/images/Cash.png")}
@@ -131,11 +129,10 @@ export default function History() {
           resizeMode="contain"
         />
       );
-    }
     return <Text style={{ fontSize: 12, marginRight: 4 }}>💳</Text>;
   };
 
-  // ===== EXPORT =====
+  // ─── Export ───────────────────────────────────────────────────────────────────
   const buildTableData = () => {
     const tableData: Record<string, string | number>[] = [];
     historyList.forEach((order) => {
@@ -172,8 +169,7 @@ export default function History() {
   };
 
   const buildWorkbook = () => {
-    const tableData = buildTableData();
-    const ws = XLSX.utils.json_to_sheet(tableData);
+    const ws = XLSX.utils.json_to_sheet(buildTableData());
     ws["!cols"] = [
       { wch: 18 },
       { wch: 20 },
@@ -194,11 +190,9 @@ export default function History() {
   const handleExportWeb = () => {
     try {
       const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
-      const wb = buildWorkbook();
-      XLSX.writeFile(wb, `Riwayat_${tokoName}_${Date.now()}.xlsx`);
-    } catch (error) {
-      console.error("Gagal export web:", error);
-      alert("Terjadi kesalahan saat mengekspor data.");
+      XLSX.writeFile(buildWorkbook(), `Riwayat_${tokoName}_${Date.now()}.xlsx`);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -206,31 +200,26 @@ export default function History() {
     if (!FileSystem) return;
     try {
       const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
-      const wb = buildWorkbook();
-      const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
+      const base64 = XLSX.write(buildWorkbook(), {
+        type: "base64",
+        bookType: "xlsx",
+      });
       const cacheDir = FileSystem.cacheDirectory ?? "";
-      if (!cacheDir) {
-        Alert.alert("Error", "Tidak menemukan direktori cache.");
-        return;
-      }
       const filePath = `${cacheDir}Riwayat_${tokoName}_${Date.now()}.xlsx`;
       await FileSystem.writeAsStringAsync(filePath, base64, {
         encoding: FileSystem.EncodingType.Base64,
       });
       const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Alert.alert("Error", "Fitur berbagi tidak tersedia di perangkat ini.");
-        return;
+      if (isAvailable) {
+        await Sharing.shareAsync(filePath, {
+          mimeType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          dialogTitle: `Ekspor Riwayat - ${tokoName}`,
+          UTI: "com.microsoft.excel.xlsx",
+        });
       }
-      await Sharing.shareAsync(filePath, {
-        mimeType:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        dialogTitle: `Ekspor Riwayat - ${tokoName}`,
-        UTI: "com.microsoft.excel.xlsx",
-      });
-    } catch (error) {
-      console.error("Gagal export native:", error);
-      Alert.alert("Gagal", "Terjadi kesalahan saat mengekspor data.");
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -239,6 +228,7 @@ export default function History() {
     Platform.OS === "web" ? handleExportWeb() : handleExportNative();
   };
 
+  // ─── Render Card ──────────────────────────────────────────────────────────────
   const renderCard = ({ item }: { item: HistoryOrder }) => (
     <Pressable
       style={styles.card}
@@ -275,6 +265,7 @@ export default function History() {
     </Pressable>
   );
 
+  // ─── UI ───────────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -303,14 +294,14 @@ export default function History() {
           </TouchableOpacity>
         </View>
 
-        {/* ===== KARTU KAS ===== */}
+        {/* Kartu Kas */}
         <View style={styles.kasCard}>
           <View style={styles.kasHeader}>
             <Text style={styles.kasTitle}>Cashbox</Text>
             <View style={styles.kasHeaderActions}>
               {kasDisimpan && (
                 <TouchableOpacity
-                  onPress={handleResetKas}
+                  onPress={() => setShowResetModal(true)}
                   style={styles.resetBtn}
                 >
                   <Text style={styles.resetText}>Reset</Text>
@@ -318,7 +309,7 @@ export default function History() {
               )}
               <TouchableOpacity
                 onPress={() => {
-                  setInputModal(modalAwal > 0 ? String(modalAwal) : "");
+                  setInputModal(modalAwal != null ? String(modalAwal) : "");
                   setShowKasModal(true);
                 }}
                 style={styles.editKasBtn}
@@ -331,21 +322,19 @@ export default function History() {
           </View>
 
           <View style={styles.kasRows}>
-            {/* Modal Awal */}
             <View style={styles.kasRow}>
               <Text style={styles.kasLabel}>Modal Awal</Text>
-              <Text style={styles.kasValue}>{formatRp(modalAwal)}</Text>
+              <Text style={styles.kasValue}>
+                {kasDisimpan ? formatRp(modalAwalDisplay) : "Belum diisi"}
+              </Text>
             </View>
-            {/* Pemasukan */}
             <View style={styles.kasRow}>
               <Text style={styles.kasLabel}>Total Pemasukan</Text>
               <Text style={[styles.kasValue, { color: "#2e7d32" }]}>
                 + {formatRp(totalPemasukan)}
               </Text>
             </View>
-            {/* Divider */}
             <View style={styles.kasDivider} />
-            {/* Saldo */}
             <View style={styles.kasRow}>
               <Text style={styles.kasSaldoLabel}>Cash Box</Text>
               <Text style={styles.kasSaldoValue}>{formatRp(saldoKas)}</Text>
@@ -388,7 +377,6 @@ export default function History() {
         )}
       </View>
 
-      {/* Bottom bar */}
       <View style={styles.bottomBar}>
         <Text style={styles.bottomBarText}>
           {historyList.length > 0
@@ -397,7 +385,46 @@ export default function History() {
         </Text>
       </View>
 
-      {/* ===== Input Modal Awal ===== */}
+      {/* ─── Modal Konfirmasi Reset ─────────────────────────────────────────────── */}
+      <Modal
+        visible={showResetModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowResetModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlayCentered}
+          onPress={() => setShowResetModal(false)}
+        >
+          <Pressable style={styles.confirmBox} onPress={() => {}}>
+            <Text style={styles.confirmIcon}>⚠️</Text>
+            <Text style={styles.confirmTitle}>Reset Modal Awal?</Text>
+            <Text style={styles.confirmDesc}>
+              Modal awal akan direset ke{"\n"}
+              <Text style={{ fontWeight: "700", color: "#4B2E2B" }}>
+                Rp 0
+              </Text>{" "}
+              silahkan isi kembali modal awal tokomu!
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowResetModal(false)}
+              >
+                <Text style={styles.cancelText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmResetBtn}
+                onPress={confirmReset}
+              >
+                <Text style={styles.confirmResetText}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── Modal Input Modal Awal ─────────────────────────────────────────────── */}
       <Modal
         visible={showKasModal}
         animationType="slide"
@@ -414,7 +441,7 @@ export default function History() {
           />
           <View style={styles.kasInputBox}>
             <View style={styles.handleBar} />
-            <Text style={styles.kasInputTitle}>Cash Box</Text>
+            <Text style={styles.kasInputTitle}>Isi Modal Awal</Text>
             <Text style={styles.kasInputSubtitle}>
               Masukkan jumlah uang yang tersedia di Cashbox sebelum berjualan
             </Text>
@@ -432,7 +459,6 @@ export default function History() {
               />
             </View>
 
-            {/* Preview */}
             {inputModal.length > 0 && (
               <Text style={styles.inputPreview}>
                 {formatRp(parseInt(inputModal || "0", 10))}
@@ -454,7 +480,7 @@ export default function History() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ===== MODAL DETAIL TRANSAKSI ===== */}
+      {/* ─── Modal Detail Transaksi ──────────────────────────────────────────────── */}
       <Modal
         visible={!!selectedOrder}
         animationType="slide"
@@ -568,12 +594,11 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: 20,
-    alignItems: "center",
   },
   exportBtnDisabled: { backgroundColor: "#ccc" },
   exportText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
-  // ===== KAS CARD =====
+  // ─── Kas Card ─────────────────────────────────────────────────────────────────
   kasCard: {
     backgroundColor: "#fdf6f0",
     borderRadius: 18,
@@ -588,16 +613,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  kasTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#4B2E2B",
-  },
-  kasHeaderActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+  kasTitle: { fontSize: 14, fontWeight: "700", color: "#4B2E2B" },
+  kasHeaderActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   resetBtn: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -605,11 +622,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e74c3c",
   },
-  resetText: {
-    fontSize: 11,
-    color: "#e74c3c",
-    fontWeight: "600",
-  },
+  resetText: { fontSize: 11, color: "#e74c3c", fontWeight: "600" },
   editKasBtn: {
     backgroundColor: "#4B2E2B",
     paddingHorizontal: 12,
@@ -625,11 +638,7 @@ const styles = StyleSheet.create({
   },
   kasLabel: { fontSize: 13, color: "#888" },
   kasValue: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
-  kasDivider: {
-    height: 1,
-    backgroundColor: "#e8d5cc",
-    marginVertical: 4,
-  },
+  kasDivider: { height: 1, backgroundColor: "#e8d5cc", marginVertical: 4 },
   kasSaldoLabel: { fontSize: 14, fontWeight: "700", color: "#4B2E2B" },
   kasSaldoValue: { fontSize: 16, fontWeight: "800", color: "#4B2E2B" },
 
@@ -644,7 +653,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 4,
   },
-  summaryText: { fontSize: 13, color: "#ffffff", fontWeight: "500" },
+  summaryText: { fontSize: 13, color: "#fff", fontWeight: "500" },
   summaryTotal: { fontSize: 14, color: "#fff", fontWeight: "700" },
 
   // Empty
@@ -707,16 +716,70 @@ const styles = StyleSheet.create({
 
   // Bottom bar
   bottomBar: { paddingVertical: 18, alignItems: "center" },
-  bottomBarText: { fontSize: 13, color: "#ffffff", fontWeight: "500" },
+  bottomBarText: { fontSize: 13, color: "#fff", fontWeight: "500" },
 
-  // Modal overlay
+  // ─── Modal overlay (slide up) ─────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "flex-end",
   },
 
-  // ===== KAS INPUT MODAL =====
+  // ─── Modal overlay (centered — untuk konfirmasi) ──────────────────────────────
+  modalOverlayCentered: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // ─── Confirm Reset Modal ──────────────────────────────────────────────────────
+  confirmBox: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 28,
+    width: "80%",
+    maxWidth: 340,
+    alignItems: "center",
+  },
+  confirmIcon: { fontSize: 40, marginBottom: 12 },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#4B2E2B",
+    marginBottom: 8,
+  },
+  confirmDesc: {
+    fontSize: 14,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#f2f2f2",
+    alignItems: "center",
+  },
+  cancelText: { fontSize: 15, fontWeight: "600", color: "#888" },
+  confirmResetBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#e74c3c",
+    alignItems: "center",
+  },
+  confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
+
+  // ─── Kas Input Modal ──────────────────────────────────────────────────────────
   kasInputBox: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 28,
@@ -779,14 +842,7 @@ const styles = StyleSheet.create({
   simpanBtnDisabled: { backgroundColor: "#ccc" },
   simpanText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 
-  // ===== DETAIL MODAL =====
-  detailBox: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 48,
-  },
+  // Handle bar
   handleBar: {
     width: 40,
     height: 4,
@@ -794,6 +850,15 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: "center",
     marginBottom: 20,
+  },
+
+  // ─── Detail Modal ─────────────────────────────────────────────────────────────
+  detailBox: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: 48,
   },
   detailHeader: {
     flexDirection: "row",

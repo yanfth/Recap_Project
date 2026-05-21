@@ -6,7 +6,6 @@ import {
 } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   FlatList,
   Image,
@@ -47,6 +46,10 @@ export default function Dashboard() {
   const [editKategori, setEditKategori] = useState<"Makanan" | "Minuman">(
     "Makanan",
   );
+
+  // State untuk konfirmasi hapus
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<MenuItem | null>(null);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const popupOpacity = useRef(new Animated.Value(0)).current;
@@ -111,27 +114,22 @@ export default function Dashboard() {
   };
 
   const handleDelete = (item: MenuItem) => {
-    setActiveMenuId(null); // Tutup dropdown
-    Alert.alert("Hapus Menu", `Yakin ingin menghapus "${item.namaMenu}"?`, [
-      { text: "Batal", style: "cancel" },
-      {
-        text: "Hapus",
-        style: "destructive",
-        onPress: () => {
-          deleteMenuItem(item.id);
-          const updatedList = getMenuList();
-          setMenuList(updatedList);
-        },
-      },
-    ]);
+    setActiveMenuId(null);
+    setDeletingItem(item);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deletingItem) return;
+    deleteMenuItem(deletingItem.id);
+    setMenuList(getMenuList());
+    setShowDeleteModal(false);
+    setDeletingItem(null);
   };
 
   const handleSaveEdit = () => {
     if (!editingItem) return;
-    if (!editNama.trim() || !editHarga.trim()) {
-      Alert.alert("Error", "Nama dan harga harus diisi");
-      return;
-    }
+    if (!editNama.trim() || !editHarga.trim()) return;
     editMenuItem(editingItem.id, {
       namaMenu: editNama.trim(),
       harga: editHarga.trim(),
@@ -183,7 +181,6 @@ export default function Dashboard() {
 
         {/* Kolom kanan: titik tiga + tombol tambah */}
         <View style={styles.cardRight}>
-          {/* Tombol titik tiga */}
           <View>
             <TouchableOpacity
               style={styles.dotsBtn}
@@ -192,7 +189,6 @@ export default function Dashboard() {
               <Text style={styles.dotsText}>⋮</Text>
             </TouchableOpacity>
 
-            {/* Dropdown muncul saat titik tiga ditekan */}
             {isOpen && (
               <View style={styles.dropdown}>
                 <TouchableOpacity
@@ -207,10 +203,7 @@ export default function Dashboard() {
                 <View style={styles.dropdownDivider} />
                 <TouchableOpacity
                   style={styles.dropdownItem}
-                  onPress={() => {
-                    setActiveMenuId(null);
-                    handleDelete(item);
-                  }}
+                  onPress={() => handleDelete(item)}
                 >
                   <Text style={styles.dropdownDelete}>🗑️ Hapus</Text>
                 </TouchableOpacity>
@@ -218,7 +211,6 @@ export default function Dashboard() {
             )}
           </View>
 
-          {/* Tombol tambah ke keranjang */}
           <Pressable
             style={styles.menuAddBtn}
             onPress={() => handleAddToCart(item)}
@@ -364,6 +356,45 @@ export default function Dashboard() {
           />
         </TouchableOpacity>
       </View>
+
+      {/* Modal Konfirmasi Hapus */}
+      <Modal
+        visible={showDeleteModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowDeleteModal(false)}
+        >
+          <Pressable style={styles.deleteBox} onPress={() => {}}>
+            <Text style={styles.deleteIcon}>🗑️</Text>
+            <Text style={styles.deleteTitle}>Hapus Menu</Text>
+            <Text style={styles.deleteDesc}>
+              Yakin ingin menghapus{"\n"}
+              <Text style={styles.deleteItemName}>
+                "{deletingItem?.namaMenu}"
+              </Text>
+              ?
+            </Text>
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.cancelText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmDeleteBtn}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.confirmDeleteText}>Hapus</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Modal Edit Menu */}
       <Modal
@@ -567,7 +598,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Kolom kanan card
+  // ─── Kolom kanan card ────────────────────────────────────────────────────────
   cardRight: {
     alignItems: "center",
     justifyContent: "space-between",
@@ -575,8 +606,6 @@ const styles = StyleSheet.create({
     overflow: "visible",
     zIndex: 10,
   },
-
-  // Tombol titik tiga
   dotsBtn: {
     width: 28,
     height: 28,
@@ -590,8 +619,6 @@ const styles = StyleSheet.create({
     color: "#4B2E2B",
     lineHeight: 20,
   },
-
-  // Dropdown menu
   dropdown: {
     position: "absolute",
     top: 0,
@@ -627,7 +654,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f0f0",
     marginHorizontal: 8,
   },
-
   menuAddBtn: {
     width: 32,
     height: 32,
@@ -718,13 +744,58 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  // ─── Modal Edit ──────────────────────────────────────────────────────────────
+  // ─── Modal Overlay (shared) ───────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // ─── Modal Hapus ─────────────────────────────────────────────────────────────
+  deleteBox: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 28,
+    width: "80%",
+    maxWidth: 360,
+    alignItems: "center",
+  },
+  deleteIcon: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  deleteTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#4B2E2B",
+    marginBottom: 8,
+  },
+  deleteDesc: {
+    fontSize: 14,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  deleteItemName: {
+    fontWeight: "700",
+    color: "#4B2E2B",
+  },
+  confirmDeleteBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#C62828",
+    alignItems: "center",
+  },
+  confirmDeleteText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
+  },
+
+  // ─── Modal Edit ──────────────────────────────────────────────────────────────
   editBox: {
     backgroundColor: "#fff",
     borderRadius: 20,
