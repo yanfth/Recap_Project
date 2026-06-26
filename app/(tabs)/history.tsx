@@ -43,8 +43,6 @@ export default function History() {
   const [historyList, setHistoryList] = useState<HistoryOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<HistoryOrder | null>(null);
 
-  // ─── State Kas ────────────────────────────────────────────────────────────────
-  // modalAwal = null artinya belum pernah diisi user (belum ada data valid)
   const [modalAwal, setModalAwal] = useState<number | null>(null);
   const [showKasModal, setShowKasModal] = useState(false);
   const [inputModal, setInputModal] = useState("");

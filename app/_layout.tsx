@@ -1,3 +1,4 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   DarkTheme,
   DefaultTheme,
@@ -6,35 +7,51 @@ import {
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
-
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { AuthProvider } from "./context/AuthContext";
 
 export const unstable_settings = {
-  anchor: "splash", // ← ganti dari (tabs) ke splash
+  anchor: "splash",
 };
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: "fade",
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="modal"
-          options={{
-            presentation: "modal",
-            title: "Modal",
-            animation: "slide_from_bottom",
+    <AuthProvider>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: "fade",
           }}
-        />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+        >
+          {/* Auth screens */}
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+
+          {/* App screens */}
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="modal"
+            options={{
+              presentation: "modal",
+              title: "Modal",
+              animation: "slide_from_bottom",
+            }}
+          />
+          <Stack.Screen name="add-stock" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="kasir-transaksi"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="pengaturan-pin"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="dashboard" options={{ headerShown: false }} />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </AuthProvider>
   );
 }

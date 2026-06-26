@@ -26,10 +26,10 @@ export default function WelcomeScreen() {
           <Text style={styles.bold}>Recap</Text>
         </Text>
 
-        {/* Tombol Lanjut */}
+        {/* Tombol Lanjut — sekarang ke /login bukan /home */}
         <TouchableOpacity
           style={styles.button}
-          onPress={() => router.push("/home")}
+          onPress={() => router.push("./login")}
         >
           <Text style={styles.buttonText}>Lanjut</Text>
         </TouchableOpacity>

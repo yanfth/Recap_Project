@@ -1,3 +1,6 @@
+// menuStore.ts — sudah digantikan oleh useStock (hooks/useStock.ts)
+// Dipertahankan agar tidak ada error missing default export
+
 type MenuItem = {
   id: string;
   namaMenu: string;
@@ -5,7 +8,6 @@ type MenuItem = {
   kategori: string;
 };
 
-// Variabel global, tidak reset selama app berjalan
 let menuList: MenuItem[] = [];
 
 export const getMenuList = () => [...menuList];
@@ -31,3 +33,5 @@ export const editMenuItem = (
 export const deleteMenuItem = (id: string) => {
   menuList = menuList.filter((item) => item.id !== id);
 };
+
+export default {};
