@@ -1,8 +1,14 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter } from "expo-router";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function WelcomeScreen() {
   const router = useRouter();
+
+  const handleLanjut = async () => {
+    await AsyncStorage.setItem("has_seen_welcome", "true");
+    router.push("/login");
+  };
 
   return (
     <View style={styles.container}>
@@ -16,7 +22,7 @@ export default function WelcomeScreen() {
         />
       </View>
 
-      {/* Bagian bawah - biru gelap */}
+      {/* Bagian bawah */}
       <View style={styles.bottomSheet}>
         <Text style={styles.title}>
           Welcome To <Text style={styles.bold}>Recap</Text>
@@ -26,11 +32,7 @@ export default function WelcomeScreen() {
           <Text style={styles.bold}>Recap</Text>
         </Text>
 
-        {/* Tombol Lanjut — sekarang ke /login bukan /home */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("./login")}
-        >
+        <TouchableOpacity style={styles.button} onPress={handleLanjut}>
           <Text style={styles.buttonText}>Lanjut</Text>
         </TouchableOpacity>
       </View>

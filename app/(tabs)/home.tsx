@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -25,11 +26,11 @@ export default function HomeScreen() {
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
   };
 
-  const handleLanjut = () => {
-    if (namaToko.trim() === "") return;
-    router.push(`/dashboard?namaToko=${namaToko}`);
-  };
-
+  const handleLanjut = async () => {
+  if (namaToko.trim() === "") return;
+  await AsyncStorage.setItem("nama_toko", namaToko.trim()); // ← simpan
+  router.push(`/dashboard?namaToko=${namaToko}`);
+};
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />

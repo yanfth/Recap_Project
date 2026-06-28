@@ -1,12 +1,13 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useAuth } from "./context/AuthContext";
 
@@ -21,48 +22,23 @@ export default function PinLoginScreen() {
 
   const shake = () => {
     Animated.sequence([
-      Animated.timing(shakeAnim, {
-        toValue: 10,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: -10,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: 8,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: -8,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: 0,
-        duration: 60,
-        useNativeDriver: true,
-      }),
+      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
     ]).start();
   };
 
   const handlePress = (val: string) => {
     if (loading) return;
-
     if (val === "⌫") {
       setPin((p) => p.slice(0, -1));
       return;
     }
-
     if (val === "" || pin.length >= 4) return;
-
     const newPin = pin + val;
     setPin(newPin);
-
-    // Auto-submit setelah 4 digit
     if (newPin.length === 4) {
       setTimeout(() => handleLogin(newPin), 150);
     }
@@ -73,20 +49,18 @@ export default function PinLoginScreen() {
     const result = await login(finalPin);
 
     if (result === "owner") {
-      // Owner: ke /home untuk setup toko
-      router.replace("/home");
+      const savedNamaToko = await AsyncStorage.getItem("nama_toko");
+      if (savedNamaToko) {
+        router.replace(`/dashboard?namaToko=${savedNamaToko}`);
+      } else {
+        router.replace("/home");
+      }
     } else if (result === "kasir") {
-      // Kasir: langsung ke dashboard transaksi
-      router.replace("/dashboard");
+      router.replace("/kasir-transaksi");
     } else {
-      // PIN salah: shake + alert
       shake();
       setPin("");
-      Alert.alert(
-        "PIN Salah",
-        "PIN yang kamu masukkan tidak valid.\nCoba lagi.",
-        [{ text: "OK" }],
-      );
+      Alert.alert("PIN Salah", "PIN yang kamu masukkan tidak valid.\nCoba lagi.", [{ text: "OK" }]);
     }
 
     setLoading(false);
@@ -97,23 +71,15 @@ export default function PinLoginScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topArea}>
-        {/* Header */}
         <Text style={styles.appTitle}>Kasir 2.0</Text>
         <Text style={styles.subtitle}>Masukkan PIN untuk masuk</Text>
 
-        {/* PIN Dots — shake saat salah */}
-        <Animated.View
-          style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}
-        >
+        <Animated.View style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}>
           {[0, 1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={[styles.dot, pin.length > i && styles.dotFilled]}
-            />
+            <View key={i} style={[styles.dot, pin.length > i && styles.dotFilled]} />
           ))}
         </Animated.View>
 
-        {/* Numpad */}
         <View style={styles.numpad}>
           {BUTTONS.map((btn, i) => (
             <TouchableOpacity
@@ -128,7 +94,6 @@ export default function PinLoginScreen() {
           ))}
         </View>
 
-        {/* Badge role — info untuk user */}
         <View style={styles.hintRow}>
           <View style={[styles.hintBadge, styles.badgeOwner]}>
             <Text style={styles.hintText}>👑 Owner</Text>
@@ -140,7 +105,6 @@ export default function PinLoginScreen() {
         <Text style={styles.hintCaption}>PIN berbeda untuk setiap role</Text>
       </View>
 
-      {/* Bottom sheet — sama seperti WelcomeScreen */}
       <View style={styles.bottomSheet}>
         <Text style={styles.recapTitle}>Recap</Text>
         <Text style={styles.recapSubtitle}>
@@ -152,12 +116,7 @@ export default function PinLoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-
-  /* ── Top area ── */
+  container: { flex: 1, backgroundColor: "#fff" },
   topArea: {
     flex: 1,
     backgroundColor: "#fff",
@@ -166,24 +125,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 20,
   },
-  appTitle: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#4B2E2B",
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: "#999",
-    marginTop: -8,
-  },
-
-  /* ── PIN Dots ── */
-  dotsRow: {
-    flexDirection: "row",
-    gap: 18,
-    marginVertical: 4,
-  },
+  appTitle: { fontSize: 26, fontWeight: "700", color: "#4B2E2B", letterSpacing: 0.5 },
+  subtitle: { fontSize: 13, color: "#999", marginTop: -8 },
+  dotsRow: { flexDirection: "row", gap: 18, marginVertical: 4 },
   dot: {
     width: 16,
     height: 16,
@@ -192,15 +136,11 @@ const styles = StyleSheet.create({
     borderColor: "#4B2E2B",
     backgroundColor: "transparent",
   },
-  dotFilled: {
-    backgroundColor: "#4B2E2B",
-  },
-
-  /* ── Numpad ── */
+  dotFilled: { backgroundColor: "#4B2E2B" },
   numpad: {
     flexDirection: "row",
     flexWrap: "wrap",
-    width: 252, // 3 kolom × (64px tombol + 12px gap) = 252
+    width: 252,
     gap: 12,
     justifyContent: "center",
   },
@@ -212,44 +152,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  numBtnHidden: {
-    backgroundColor: "transparent", // tombol kosong tengah bawah
-  },
-  numText: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#4B2E2B",
-  },
-
-  /* ── Badge role ── */
-  hintRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
-  },
-  hintBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  badgeOwner: {
-    backgroundColor: "#4B2E2B",
-  },
-  badgeKasir: {
-    backgroundColor: "#7a5c59",
-  },
-  hintText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  hintCaption: {
-    fontSize: 11,
-    color: "#bbb",
-    marginTop: -8,
-  },
-
-  /* ── Bottom sheet ── */
+  numBtnHidden: { backgroundColor: "transparent" },
+  numText: { fontSize: 22, fontWeight: "600", color: "#4B2E2B" },
+  hintRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  hintBadge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 999 },
+  badgeOwner: { backgroundColor: "#4B2E2B" },
+  badgeKasir: { backgroundColor: "#7a5c59" },
+  hintText: { color: "#fff", fontSize: 12, fontWeight: "500" },
+  hintCaption: { fontSize: 11, color: "#bbb", marginTop: -8 },
   bottomSheet: {
     backgroundColor: "#4B2E2B",
     borderTopLeftRadius: 30,
@@ -258,19 +168,7 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     alignItems: "center",
   },
-  recapTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 8,
-  },
-  recapSubtitle: {
-    fontSize: 13,
-    color: "#fff",
-    textAlign: "center",
-  },
-  bold: {
-    fontWeight: "bold",
-    color: "#fff",
-  },
+  recapTitle: { fontSize: 28, fontWeight: "bold", color: "#fff", marginBottom: 8 },
+  recapSubtitle: { fontSize: 13, color: "#fff", textAlign: "center" },
+  bold: { fontWeight: "bold", color: "#fff" },
 });

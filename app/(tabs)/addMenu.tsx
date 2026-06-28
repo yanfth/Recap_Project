@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
   Alert,
@@ -11,12 +11,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useStock } from "../hooks/useStock";
+import { addMenuItem } from "../store/menuStore";
 
 export default function AddMenu() {
-  const { namaToko } = useLocalSearchParams();
   const router = useRouter();
-  const { tambahProduk } = useStock();
 
   const [namaMenu, setNamaMenu] = useState("");
   const [harga, setHarga] = useState("");
@@ -54,23 +52,19 @@ export default function AddMenu() {
     }
 
     setLoading(true);
-    await tambahProduk({
-      nama: namaMenu.trim(),
-      harga: hargaNum,
-      modal: 0,
-      stok: 0,
+    await addMenuItem({
+      namaMenu: namaMenu.trim(),
+      harga: String(hargaNum),
       kategori: selectedKategori,
+      stok: 0,
     });
     setLoading(false);
 
-    // Kembali ke halaman sebelumnya dulu
     router.back();
-
-    // Tampilkan notifikasi setelah kembali
     setTimeout(() => {
       Alert.alert(
         "Menu Ditambahkan ✅",
-        `"${namaMenu.trim()}" berhasil disimpan.\nCek dan tambahkan stok di menu "Tambah Stok".`
+        `"${namaMenu.trim()}" berhasil disimpan.\nTambahkan stok di menu "Tambah Stok".`
       );
     }, 300);
   };

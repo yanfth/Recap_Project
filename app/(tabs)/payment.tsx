@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { clearCart, getCart, getTotalHarga } from "../store/cartStore";
 import { addToHistory } from "../store/historyStore";
+import { editMenuItem, getMenuList } from "../store/menuStore";
 
 type CartItem = {
   id: string;
@@ -49,8 +50,18 @@ export default function Payment() {
     setShowStruk(true);
   };
 
-  // Yang baru
-  const handleSelesai = () => {
+  const handleSelesai = async () => {
+    // Kurangi stok setiap item yang dibeli
+    const menuList = await getMenuList();
+
+    for (const cartItem of cartList) {
+      const produk = menuList.find((m) => m.namaMenu === cartItem.namaMenu);
+      if (produk) {
+        const stokBaru = Math.max(0, (produk.stok ?? 0) - cartItem.qty);
+        await editMenuItem(produk.id, { stok: stokBaru });
+      }
+    }
+
     addToHistory({
       nomorStruk,
       namaToko: namaToko as string,
@@ -199,7 +210,6 @@ export default function Payment() {
           {metodeBayar === "QRIS" && (
             <View style={styles.qrisBox}>
               <Text style={styles.qrisTitle}>Scan QR Berikut</Text>
-              {/* QR Placeholder */}
               <View style={styles.qrPlaceholder}>
                 <Text style={styles.qrText}>▦</Text>
               </View>
@@ -259,7 +269,6 @@ export default function Payment() {
               </Text>
             </View>
 
-            {/* Garis putus-putus */}
             <View style={styles.dashedLine} />
 
             {/* Info Struk */}
@@ -279,7 +288,6 @@ export default function Payment() {
               </View>
             </View>
 
-            {/* Garis putus-putus */}
             <View style={styles.dashedLine} />
 
             {/* Item List */}
@@ -298,7 +306,6 @@ export default function Payment() {
               ))}
             </View>
 
-            {/* Garis putus-putus */}
             <View style={styles.dashedLine} />
 
             {/* Total */}
@@ -309,7 +316,6 @@ export default function Payment() {
               </Text>
             </View>
 
-            {/* Footer struk */}
             <Text style={styles.strukFooter}>
               Selamat menikmati pesanan Anda 🙏
             </Text>
@@ -330,10 +336,7 @@ export default function Payment() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#4B2E2B",
-  },
+  container: { flex: 1, backgroundColor: "#4B2E2B" },
   topArea: {
     flex: 1,
     backgroundColor: "#fff",
@@ -348,20 +351,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
   },
-  backIcon: {
-    width: 24,
-    height: 24,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#4B2E2B",
-  },
-
-  // Section
-  section: {
-    marginBottom: 20,
-  },
+  backIcon: { width: 24, height: 24 },
+  title: { fontSize: 18, fontWeight: "bold", color: "#4B2E2B" },
+  section: { marginBottom: 20 },
   sectionTitle: {
     fontSize: 13,
     fontWeight: "700",
@@ -370,8 +362,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 12,
   },
-
-  // Order rows
   orderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -390,8 +380,6 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: 15, fontWeight: "600", color: "#4B2E2B" },
   totalValue: { fontSize: 16, fontWeight: "bold", color: "#4B2E2B" },
-
-  // Metode Card
   metodeCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -403,10 +391,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
     gap: 12,
   },
-  metodeCardActive: {
-    borderColor: "#4B2E2B",
-    backgroundColor: "#eef0f5",
-  },
+  metodeCardActive: { borderColor: "#4B2E2B", backgroundColor: "#eef0f5" },
   metodeIcon: {
     width: 44,
     height: 44,
@@ -420,11 +405,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   metodeImage: { width: 32, height: 32 },
-  metodeName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#555",
-  },
+  metodeName: { fontSize: 15, fontWeight: "600", color: "#555" },
   metodeNameActive: { color: "#4B2E2B" },
   metodeDesc: { fontSize: 12, color: "#aaa", marginTop: 1 },
   radioOuter: {
@@ -443,8 +424,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "#4B2E2B",
   },
-
-  // QRIS Box
   qrisBox: {
     backgroundColor: "#f8f9fb",
     borderRadius: 16,
@@ -471,8 +450,6 @@ const styles = StyleSheet.create({
   },
   qrText: { fontSize: 80, color: "#4B2E2B" },
   qrisHint: { fontSize: 12, color: "#aaa" },
-
-  // Bottom Sheet
   bottomSheet: {
     backgroundColor: "#4B2E2B",
     padding: 24,
@@ -484,7 +461,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  bottomLabel: { fontSize: 15, color: "#ffffffff", fontWeight: "500" },
+  bottomLabel: { fontSize: 15, color: "#fff", fontWeight: "500" },
   bottomHarga: { fontSize: 20, color: "#fff", fontWeight: "bold" },
   bayarBtn: {
     backgroundColor: "#fff",
@@ -494,9 +471,7 @@ const styles = StyleSheet.create({
   },
   bayarBtnDisabled: { backgroundColor: "#2a2323ff" },
   bayarText: { color: "#4B2E2B", fontSize: 16, fontWeight: "600" },
-  bayarTextDisabled: { color: "#ffffffff" },
-
-  // ===== STRUK MODAL =====
+  bayarTextDisabled: { color: "#fff" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -509,10 +484,7 @@ const styles = StyleSheet.create({
     padding: 28,
     paddingBottom: 48,
   },
-  strukHeader: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
+  strukHeader: { alignItems: "center", marginBottom: 16 },
   checkmarkCircle: {
     width: 72,
     height: 72,
@@ -522,10 +494,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  checkmarkIcon: {
-    width: 48,
-    height: 48,
-  },
+  checkmarkIcon: { width: 48, height: 48 },
   strukSuccessText: {
     fontSize: 20,
     fontWeight: "bold",
@@ -533,14 +502,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   strukSubText: { fontSize: 13, color: "#aaa" },
-
   dashedLine: {
     borderStyle: "dashed",
     borderWidth: 1,
     borderColor: "#ddd",
     marginVertical: 14,
   },
-
   strukBody: { gap: 8 },
   namaTokoStruk: {
     fontSize: 16,
@@ -549,28 +516,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textAlign: "center",
   },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
+  infoRow: { flexDirection: "row", justifyContent: "space-between" },
   infoKey: { fontSize: 13, color: "#aaa" },
   infoVal: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
-
   strukItems: { gap: 8 },
   strukItemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  strukItemName: {
-    fontSize: 13,
-    color: "#333",
-    flex: 1,
-    marginRight: 8,
-  },
-  strukItemQty: { color: "#fff" },
+  strukItemName: { fontSize: 13, color: "#333", flex: 1, marginRight: 8 },
+  strukItemQty: { color: "#aaa" },
   strukItemHarga: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
-
   strukTotalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -582,29 +539,19 @@ const styles = StyleSheet.create({
     color: "#4B2E2B",
     letterSpacing: 1,
   },
-  strukTotalValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#4B2E2B",
-  },
-
+  strukTotalValue: { fontSize: 18, fontWeight: "bold", color: "#4B2E2B" },
   strukFooter: {
     textAlign: "center",
     fontSize: 13,
-    color: "#dbdbdbff",
+    color: "#dbdbdb",
     marginTop: 16,
     marginBottom: 20,
   },
-
   selesaiBtn: {
     backgroundColor: "#4B2E2B",
     paddingVertical: 16,
     borderRadius: 999,
     alignItems: "center",
   },
-  selesaiText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  selesaiText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });

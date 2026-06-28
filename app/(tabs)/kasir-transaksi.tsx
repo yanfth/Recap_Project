@@ -1,11 +1,13 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Stack,
   useFocusEffect,
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   FlatList,
   Image,
@@ -16,20 +18,28 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../context/AuthContext";
 import { addToCart, getTotalQty } from "../store/cartStore";
 import { getMenuList } from "../store/menuStore";
 
+
 type MenuItem = {
   id: string;
-  namaMenu: string;
+  namaMenu?: string;
+  nama?: string;       // 🌟 Tolong antisipasi jika owner menyimpan dengan key 'nama'
+  namaProduk?: string; // 🌟 Tolong antisipasi jika owner menyimpan dengan key 'namaProduk'
   harga: string;
-  kategori: string;
+  kategori?: string;
+  stok?: number; 
 };
 
 export default function KasirTransaksi() {
-  const { namaToko } = useLocalSearchParams();
+  const { namaToko: namaTokoParam } = useLocalSearchParams();
   const router = useRouter();
+  const auth = useAuth();
+  const role = auth?.role;
 
+  const [namaToko, setNamaToko] = useState<string>("Toko");
   const [menuList, setMenuList] = useState<MenuItem[]>([]);
   const [activeTab, setActiveTab] = useState("Semua");
   const [totalCart, setTotalCart] = useState(0);
@@ -40,14 +50,39 @@ export default function KasirTransaksi() {
   const popupTranslateY = useRef(new Animated.Value(20)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
+  // ─── Load namaToko dari params atau AsyncStorage ──────────────────────────
+  useEffect(() => {
+    if (namaTokoParam) {
+      setNamaToko(namaTokoParam as string);
+    } else {
+      AsyncStorage.getItem("nama_toko").then((val) => {
+        if (val) setNamaToko(val);
+      });
+    }
+  }, [namaTokoParam]);
+
+  // ─── Load menu terupdate otomatis dari store owner ────────────────────────
   useFocusEffect(
     useCallback(() => {
-      setMenuList(getMenuList());
+      getMenuList().then((list) => {
+        console.log("Data Menu dari Owner:", list); // Membantu debugging di terminal/console log
+        setMenuList(list || []);
+      });
       setTotalCart(getTotalQty());
     }, []),
   );
 
-  // ─── Popup animasi ────────────────────────────────────────────────────────────
+  // ─── Handle back/keluar ───────────────────────────────────────────────────
+  const handleBack = () => {
+    if (role === "kasir") {
+      auth?.logout();
+      router.replace("/login");
+    } else {
+      router.back();
+    }
+  };
+
+  // ─── Popup animasi ────────────────────────────────────────────────────────
   const triggerPopup = () => {
     popupOpacity.setValue(0);
     popupTranslateY.setValue(20);
@@ -83,136 +118,198 @@ export default function KasirTransaksi() {
     });
   };
 
+  // ─── Handle Tambah ke Keranjang + Validasi Stok ────────────────────────────
   const handleAddToCart = (item: MenuItem) => {
-    addToCart(item);
-    setTotalCart(getTotalQty());
-    triggerPopup();
+  const namaTampil = item.namaMenu || item.nama || item.namaProduk || "Produk";
+  const ketersediaanStok = item.stok ?? 0;
+
+  if (ketersediaanStok <= 0) {
+    Alert.alert("Stok Habis", `${namaTampil} sudah habis!`);
+    return;
+  }
+
+  const normalizedItem = {
+    id: item.id,
+    namaMenu: namaTampil,
+    harga: item.harga,
+    kategori: item.kategori || "Makanan",
+    stok: ketersediaanStok,
   };
+
+  const result = addToCart(normalizedItem);
+
+  if (result === "stok_tidak_cukup") {
+    Alert.alert(
+      "Stok Tidak Cukup",
+      `Stok ${namaTampil} hanya tersisa ${ketersediaanStok} pcs.\nTidak bisa menambah lebih banyak.`
+    );
+    return;
+  }
+
+  setTotalCart(getTotalQty());
+  triggerPopup();
+};
 
   const onPressIn = () =>
     Animated.spring(scaleAnim, { toValue: 0.9, useNativeDriver: true }).start();
   const onPressOut = () =>
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
 
-  // ─── Filter ───────────────────────────────────────────────────────────────────
-  const filteredMenu = menuList
-    .filter((m) => activeTab === "Semua" || m.kategori === activeTab)
-    .filter((m) =>
-      m.namaMenu.toLowerCase().includes(searchQuery.toLowerCase()),
+  // ─── Filter Aman (Mencegah Aplikasi Kosong/Crash karena salah Key) ─────────
+  const filteredMenu = (menuList || []).filter((m) => {
+    if (!m) return false;
+    
+    // Ambil nama dari key mana saja yang tersedia
+    const namaItem = (m.namaMenu || m.nama || m.namaProduk || "").toLowerCase();
+    const kategoriItem = (m.kategori || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
+
+    // Cocokkan filter tab kategori
+    const matchTab =
+      activeTab === "Semua" ||
+      kategoriItem === activeTab.toLowerCase() ||
+      (!m.kategori && activeTab === "Makanan"); // Defaultkan ke makanan jika owner lupa set kategori
+
+    // Cocokkan filter pencarian teks
+    const matchSearch = namaItem.includes(query);
+
+    return matchTab && matchSearch;
+  });
+
+  // ─── Render Card Menu ─────────────────────────────────────────────────────
+  const renderMenu = ({ item }: { item: MenuItem }) => {
+    const ketersediaanStok = item.stok ?? 0;
+    const isOutofStock = ketersediaanStok <= 0;
+    const namaTampil = item.namaMenu || item.nama || item.namaProduk || "Produk";
+    const kategoriTampil = (item.kategori || "Makanan").toLowerCase();
+
+    return (
+      <View style={[styles.menuCard, isOutofStock && styles.menuCardDisabled]}>
+        <View style={styles.menuImageBox}>
+          <Image
+            source={
+              kategoriTampil === "minuman"
+                ? require("../../assets/images/Drink.png")
+                : require("../../assets/images/Food.png")
+            }
+            style={styles.menuCategoryIcon}
+          />
+        </View>
+
+        <View style={styles.menuInfo}>
+          <Text style={styles.menuName}>{namaTampil}</Text>
+          <Text style={styles.menuSub}>
+            {kategoriTampil === "minuman" ? "🥤 Minuman" : "🍜 Makanan"}
+          </Text>
+          <Text style={styles.menuHarga}>
+            Rp {parseInt(item.harga || "0").toLocaleString("id-ID")}
+          </Text>
+          <Text style={[styles.menuStok, isOutofStock ? styles.stokHabis : styles.stokTersedia]}>
+            Stok: {ketersediaanStok} pcs
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.menuAddBtn, isOutofStock && styles.menuAddBtnDisabled]}
+          onPress={() => handleAddToCart(item)}
+          disabled={isOutofStock}
+        >
+          <Text style={styles.menuAddText}>{isOutofStock ? "✕" : "+"}</Text>
+        </TouchableOpacity>
+      </View>
     );
+  };
 
-  // ─── Render Card ──────────────────────────────────────────────────────────────
-  const renderMenu = ({ item }: { item: MenuItem }) => (
-    <View style={styles.menuCard}>
-      <View style={styles.menuImageBox}>
-        <Image
-          source={
-            item.kategori === "Makanan"
-              ? require("../../assets/images/Food.png")
-              : require("../../assets/images/Drink.png")
-          }
-          style={styles.menuCategoryIcon}
+  // ─── Render Header Komponen untuk FlatList ───────────────────────────────
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      {/* Header */}
+      <View style={styles.pageHeader}>
+        <TouchableOpacity 
+          onPress={handleBack} 
+          style={styles.backBtn}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <Text style={styles.backText}>
+            {role === "kasir" ? "🚪 Keluar" : "← Kembali"}
+          </Text>
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.tokoName}>{namaToko}</Text>
+          <View style={styles.kasirBadge}>
+            <Text style={styles.kasirBadgeText}>🧾 Mode Kasir</Text>
+          </View>
+        </View>
+        <View style={{ width: 70 }} />
+      </View>
+
+      {/* Tab filter kategori */}
+      <View style={styles.tabRow}>
+        {["Semua", "Makanan", "Minuman"].map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.tabActive]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Search bar */}
+      <View style={styles.searchBar}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cari menu..."
+          placeholderTextColor="#bbb"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <Text style={styles.searchClear}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
-
-      <View style={styles.menuInfo}>
-        <Text style={styles.menuName}>{item.namaMenu}</Text>
-        <Text style={styles.menuSub}>
-          {item.kategori === "Makanan" ? "🍜 Makanan" : "🥤 Minuman"}
-        </Text>
-        <Text style={styles.menuHarga}>
-          Rp {parseInt(item.harga).toLocaleString("id-ID")}
-        </Text>
-      </View>
-
-      {/* ✅ Kasir: hanya tombol tambah, tanpa edit/hapus */}
-      <Pressable
-        style={styles.menuAddBtn}
-        onPress={() => handleAddToCart(item)}
-      >
-        <Text style={styles.menuAddText}>+</Text>
-      </Pressable>
     </View>
   );
 
-  // ─── UI ───────────────────────────────────────────────────────────────────────
+  // ─── UI ───────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topArea}>
-        {/* Header */}
-        <View style={styles.pageHeader}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backBtn}
-          >
-            <Text style={styles.backText}>← Kembali</Text>
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Text style={styles.tokoName}>{namaToko}</Text>
-            <View style={styles.kasirBadge}>
-              <Text style={styles.kasirBadgeText}>🧾 Mode Kasir</Text>
-            </View>
-          </View>
-          <View style={{ width: 70 }} />
-        </View>
-
-        {/* Tab filter kategori */}
-        <View style={styles.tabRow}>
-          {["Semua", "Makanan", "Minuman"].map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === tab && styles.tabTextActive,
-                ]}
-              >
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Search bar */}
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Cari menu..."
-            placeholderTextColor="#bbb"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Text style={styles.searchClear}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Daftar menu */}
         {filteredMenu.length === 0 ? (
-          <View style={styles.emptyArea}>
-            <Text style={styles.emptyIcon}>🍽️</Text>
-            <Text style={styles.emptyText}>
-              {searchQuery.length > 0
-                ? `Tidak ada menu "${searchQuery}"`
-                : "Belum ada menu tersedia\nHubungi owner untuk menambahkan menu"}
-            </Text>
-          </View>
+          <FlatList
+            data={[]}
+            renderItem={null}
+            ListHeaderComponent={
+              <>
+                {renderHeader()}
+                <View style={styles.emptyArea}>
+                  <Text style={styles.emptyIcon}>🍽️</Text>
+                  <Text style={styles.emptyText}>
+                    {searchQuery.length > 0
+                      ? `Tidak ada menu "${searchQuery}"`
+                      : "Belum ada menu tersedia\nHubungi owner untuk menambahkan menu"}
+                  </Text>
+                </View>
+              </>
+            }
+            showsVerticalScrollIndicator={false}
+          />
         ) : (
           <FlatList
             data={filteredMenu}
             keyExtractor={(item) => item.id}
             renderItem={renderMenu}
+            ListHeaderComponent={renderHeader}
             contentContainerStyle={{
               gap: 12,
-              paddingTop: 16,
               paddingBottom: 100,
             }}
             showsVerticalScrollIndicator={false}
@@ -235,22 +332,19 @@ export default function KasirTransaksi() {
         </Animated.View>
       )}
 
-      {/* Bottom Navigation — kasir: Home, Keranjang, Riwayat */}
+      {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        {/* Home → kembali ke dashboard utama */}
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.navItem} onPress={handleBack}>
           <Image
             source={require("../../assets/images/home.png")}
             style={styles.navIcon}
             resizeMode="contain"
           />
-          <Text style={styles.navLabel}>Home</Text>
+          <Text style={styles.navLabel}>
+            {role === "kasir" ? "Keluar" : "Home"}
+          </Text>
         </TouchableOpacity>
 
-        {/* Keranjang */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push(`/cart?namaToko=${namaToko}`)}
@@ -270,7 +364,6 @@ export default function KasirTransaksi() {
           <Text style={styles.navLabel}>Keranjang</Text>
         </TouchableOpacity>
 
-        {/* Riwayat */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push(`/history?namaToko=${namaToko}`)}
@@ -284,7 +377,7 @@ export default function KasirTransaksi() {
         </TouchableOpacity>
       </View>
 
-      {/* Tombol bayar floating (muncul kalau keranjang tidak kosong) */}
+      {/* FAB keranjang */}
       {totalCart > 0 && (
         <Animated.View
           style={[styles.fabWrap, { transform: [{ scale: scaleAnim }] }]}
@@ -308,31 +401,28 @@ export default function KasirTransaksi() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#4B2E2B" },
-
   topArea: {
     flex: 1,
     backgroundColor: "#fff",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    padding: 24,
+    paddingHorizontal: 24,
     paddingTop: 48,
   },
-
-  // Header
+  headerContainer: {
+    paddingBottom: 16,
+    backgroundColor: "#fff",
+  },
   pageHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 16,
   },
-  backBtn: { width: 70 },
+  backBtn: { width: 70, justifyContent: 'center' },
   backText: { fontSize: 13, color: "#4B2E2B", fontWeight: "500" },
   headerCenter: { alignItems: "center", gap: 4 },
-  tokoName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#4B2E2B",
-  },
+  tokoName: { fontSize: 18, fontWeight: "bold", color: "#4B2E2B" },
   kasirBadge: {
     backgroundColor: "#fdf6f0",
     borderRadius: 20,
@@ -342,8 +432,6 @@ const styles = StyleSheet.create({
     borderColor: "#e8d5cc",
   },
   kasirBadgeText: { fontSize: 11, color: "#4B2E2B", fontWeight: "600" },
-
-  // Tab
   tabRow: { flexDirection: "row", gap: 10, marginBottom: 8 },
   tab: {
     paddingVertical: 8,
@@ -354,8 +442,6 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: "#4B2E2B" },
   tabText: { fontSize: 13, color: "#888" },
   tabTextActive: { color: "#fff", fontWeight: "500" },
-
-  // Search
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -372,13 +458,9 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 16 },
   searchInput: { flex: 1, fontSize: 14, color: "#4B2E2B", paddingVertical: 0 },
   searchClear: { fontSize: 14, color: "#bbb", fontWeight: "600", paddingLeft: 4 },
-
-  // Empty
-  emptyArea: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
+  emptyArea: { height: 300, justifyContent: "center", alignItems: "center", gap: 12 },
   emptyIcon: { fontSize: 48 },
   emptyText: { fontSize: 15, color: "#bbb", textAlign: "center", lineHeight: 24 },
-
-  // Menu Card
   menuCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -390,6 +472,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 3,
+  },
+  menuCardDisabled: {
+    opacity: 0.5,
+    backgroundColor: "#f5f5f5",
   },
   menuImageBox: {
     width: 70,
@@ -404,6 +490,9 @@ const styles = StyleSheet.create({
   menuName: { fontSize: 15, fontWeight: "600", color: "#4B2E2B" },
   menuSub: { fontSize: 12, color: "#aaa" },
   menuHarga: { fontSize: 14, fontWeight: "600", color: "#4B2E2B", marginTop: 4 },
+  menuStok: { fontSize: 11, fontWeight: "600", marginTop: 2 },
+  stokTersedia: { color: "#2E7D32" },
+  stokHabis: { color: "#C62828" },
   menuAddBtn: {
     width: 36,
     height: 36,
@@ -412,9 +501,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  menuAddBtnDisabled: {
+    backgroundColor: "#ccc",
+  },
   menuAddText: { color: "#fff", fontSize: 22, lineHeight: 24 },
-
-  // Popup
   popup: {
     position: "absolute",
     bottom: 90,
@@ -432,14 +522,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   popupText: { color: "#4B2E2B", fontSize: 14, fontWeight: "500" },
-
-  // FAB keranjang
-  fabWrap: {
-    position: "absolute",
-    bottom: 90,
-    right: 24,
-    zIndex: 999,
-  },
+  fabWrap: { position: "absolute", bottom: 90, right: 24, zIndex: 999 },
   fab: {
     width: 56,
     height: 56,
@@ -465,8 +548,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   fabBadgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
-
-  // Bottom Nav
   bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",

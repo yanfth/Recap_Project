@@ -1,124 +1,73 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  addMenuItem,
+  deleteMenuItem,
+  editMenuItem,
+  getMenuList,
+  MenuItem,
+} from "../store/menuStore";
 
-export interface Product {
+export type Produk = {
   id: string;
   nama: string;
   harga: number;
   modal: number;
   stok: number;
-  kategori?: string;
-}
+  kategori: string;
+};
 
-export interface RiwayatTransaksi {
-  id: string;
-  produkId: string;
-  namaProduk: string;
-  jumlah: number;
-  totalHarga: number;
-  waktu: string;
-}
+// Konversi MenuItem (menuStore) → Produk (format lama useStock)
+const toMenuItem = (p: Produk): Omit<MenuItem, "id"> => ({
+  namaMenu: p.nama,
+  harga: String(p.harga),
+  kategori: p.kategori,
+  stok: p.stok,
+});
 
-const KEY_PRODUK = "produk_list";
-const KEY_RIWAYAT = "riwayat_transaksi";
+const toProduk = (m: MenuItem): Produk => ({
+  id: m.id,
+  nama: m.namaMenu,
+  harga: Number(m.harga),
+  modal: 0,
+  stok: m.stok ?? 0,
+  kategori: m.kategori ?? "Makanan",
+});
 
 export function useStock() {
-  const [produkList, setProdukList] = useState<Product[]>([]);
-  const [riwayatList, setRiwayatList] = useState<RiwayatTransaksi[]>([]);
+  const [produkList, setProdukList] = useState<Produk[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    load();
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const list = await getMenuList();
+    setProdukList(list.map(toProduk));
+    setLoading(false);
   }, []);
 
-  const load = async () => {
-    setLoading(true);
-    const [rawProduk, rawRiwayat] = await Promise.all([
-      AsyncStorage.getItem(KEY_PRODUK),
-      AsyncStorage.getItem(KEY_RIWAYAT),
-    ]);
-    if (rawProduk) setProdukList(JSON.parse(rawProduk));
-    if (rawRiwayat) setRiwayatList(JSON.parse(rawRiwayat));
-    setLoading(false);
+  // Auto-reload setiap kali halaman difokus
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload])
+  );
+
+  const tambahProduk = async (data: Omit<Produk, "id">) => {
+    await addMenuItem(toMenuItem({ ...data, id: "" }));
+    await reload();
   };
 
-  const saveProduk = async (list: Product[]) => {
-    await AsyncStorage.setItem(KEY_PRODUK, JSON.stringify(list));
-    setProdukList(list);
-  };
-
-  const saveRiwayat = async (list: RiwayatTransaksi[]) => {
-    await AsyncStorage.setItem(KEY_RIWAYAT, JSON.stringify(list));
-    setRiwayatList(list);
-  };
-
-  const tambahProduk = async (produk: Omit<Product, "id">) => {
-    const newProduk: Product = { ...produk, id: Date.now().toString() };
-    await saveProduk([...produkList, newProduk]);
-  };
-
-  const tambahStok = async (id: string, jumlah: number) => {
-    if (jumlah <= 0) throw new Error("Jumlah stok harus lebih dari 0");
-    const updated = produkList.map((p) =>
-      p.id === id ? { ...p, stok: p.stok + jumlah } : p,
-    );
-    await saveProduk(updated);
-  };
-
-  const editModal = async (id: string, modalBaru: number) => {
-    if (modalBaru < 0) throw new Error("Harga modal tidak boleh negatif");
-    const updated = produkList.map((p) =>
-      p.id === id ? { ...p, modal: modalBaru } : p,
-    );
-    await saveProduk(updated);
-  };
-
-  const editProduk = async (id: string, data: Partial<Omit<Product, "id">>) => {
-    const updated = produkList.map((p) =>
-      p.id === id ? { ...p, ...data } : p,
-    );
-    await saveProduk(updated);
+  const tambahStok = async (id: string, qty: number) => {
+    const produk = produkList.find((p) => p.id === id);
+    if (!produk) return;
+    await editMenuItem(id, { stok: produk.stok + qty });
+    await reload();
   };
 
   const hapusProduk = async (id: string) => {
-    await saveProduk(produkList.filter((p) => p.id !== id));
+    await deleteMenuItem(id);
+    await reload();
   };
 
-  const transaksi = async (
-    id: string,
-    jumlah: number = 1,
-  ): Promise<"ok" | "stok_habis" | "tidak_ditemukan"> => {
-    const produk = produkList.find((p) => p.id === id);
-    if (!produk) return "tidak_ditemukan";
-    if (produk.stok < jumlah) return "stok_habis";
-
-    const updatedProduk = produkList.map((p) =>
-      p.id === id ? { ...p, stok: p.stok - jumlah } : p,
-    );
-    await saveProduk(updatedProduk);
-
-    const newRiwayat: RiwayatTransaksi = {
-      id: Date.now().toString(),
-      produkId: id,
-      namaProduk: produk.nama,
-      jumlah,
-      totalHarga: produk.harga * jumlah,
-      waktu: new Date().toISOString(),
-    };
-    await saveRiwayat([newRiwayat, ...riwayatList]);
-    return "ok";
-  };
-
-  return {
-    produkList,
-    riwayatList,
-    loading,
-    reload: load,
-    tambahProduk,
-    tambahStok,
-    editModal,
-    editProduk,
-    hapusProduk,
-    transaksi,
-  };
+  return { produkList, loading, tambahProduk, tambahStok, hapusProduk, reload };
 }
