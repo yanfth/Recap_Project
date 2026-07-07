@@ -22,15 +22,14 @@ import { useAuth } from "../context/AuthContext";
 import { addToCart, getTotalQty } from "../store/cartStore";
 import { getMenuList } from "../store/menuStore";
 
-
 type MenuItem = {
   id: string;
   namaMenu?: string;
-  nama?: string;       // 🌟 Tolong antisipasi jika owner menyimpan dengan key 'nama'
-  namaProduk?: string; // 🌟 Tolong antisipasi jika owner menyimpan dengan key 'namaProduk'
+  nama?: string;
+  namaProduk?: string;
   harga: string;
   kategori?: string;
-  stok?: number; 
+  stok?: number;
 };
 
 export default function KasirTransaksi() {
@@ -120,35 +119,36 @@ export default function KasirTransaksi() {
 
   // ─── Handle Tambah ke Keranjang + Validasi Stok ────────────────────────────
   const handleAddToCart = (item: MenuItem) => {
-  const namaTampil = item.namaMenu || item.nama || item.namaProduk || "Produk";
-  const ketersediaanStok = item.stok ?? 0;
+    const namaTampil =
+      item.namaMenu || item.nama || item.namaProduk || "Produk";
+    const ketersediaanStok = item.stok ?? 0;
 
-  if (ketersediaanStok <= 0) {
-    Alert.alert("Stok Habis", `${namaTampil} sudah habis!`);
-    return;
-  }
+    if (ketersediaanStok <= 0) {
+      Alert.alert("Stok Habis", `${namaTampil} sudah habis!`);
+      return;
+    }
 
-  const normalizedItem = {
-    id: item.id,
-    namaMenu: namaTampil,
-    harga: item.harga,
-    kategori: item.kategori || "Makanan",
-    stok: ketersediaanStok,
+    const normalizedItem = {
+      id: item.id,
+      namaMenu: namaTampil,
+      harga: item.harga,
+      kategori: item.kategori || "Makanan",
+      stok: ketersediaanStok,
+    };
+
+    const result = addToCart(normalizedItem);
+
+    if (result === "stok_tidak_cukup") {
+      Alert.alert(
+        "Stok Tidak Cukup",
+        `Stok ${namaTampil} hanya tersisa ${ketersediaanStok} pcs.\nTidak bisa menambah lebih banyak.`,
+      );
+      return;
+    }
+
+    setTotalCart(getTotalQty());
+    triggerPopup();
   };
-
-  const result = addToCart(normalizedItem);
-
-  if (result === "stok_tidak_cukup") {
-    Alert.alert(
-      "Stok Tidak Cukup",
-      `Stok ${namaTampil} hanya tersisa ${ketersediaanStok} pcs.\nTidak bisa menambah lebih banyak.`
-    );
-    return;
-  }
-
-  setTotalCart(getTotalQty());
-  triggerPopup();
-};
 
   const onPressIn = () =>
     Animated.spring(scaleAnim, { toValue: 0.9, useNativeDriver: true }).start();
@@ -158,7 +158,7 @@ export default function KasirTransaksi() {
   // ─── Filter Aman (Mencegah Aplikasi Kosong/Crash karena salah Key) ─────────
   const filteredMenu = (menuList || []).filter((m) => {
     if (!m) return false;
-    
+
     // Ambil nama dari key mana saja yang tersedia
     const namaItem = (m.namaMenu || m.nama || m.namaProduk || "").toLowerCase();
     const kategoriItem = (m.kategori || "").toLowerCase();
@@ -180,7 +180,8 @@ export default function KasirTransaksi() {
   const renderMenu = ({ item }: { item: MenuItem }) => {
     const ketersediaanStok = item.stok ?? 0;
     const isOutofStock = ketersediaanStok <= 0;
-    const namaTampil = item.namaMenu || item.nama || item.namaProduk || "Produk";
+    const namaTampil =
+      item.namaMenu || item.nama || item.namaProduk || "Produk";
     const kategoriTampil = (item.kategori || "Makanan").toLowerCase();
 
     return (
@@ -204,7 +205,12 @@ export default function KasirTransaksi() {
           <Text style={styles.menuHarga}>
             Rp {parseInt(item.harga || "0").toLocaleString("id-ID")}
           </Text>
-          <Text style={[styles.menuStok, isOutofStock ? styles.stokHabis : styles.stokTersedia]}>
+          <Text
+            style={[
+              styles.menuStok,
+              isOutofStock ? styles.stokHabis : styles.stokTersedia,
+            ]}
+          >
             Stok: {ketersediaanStok} pcs
           </Text>
         </View>
@@ -225,8 +231,8 @@ export default function KasirTransaksi() {
     <View style={styles.headerContainer}>
       {/* Header */}
       <View style={styles.pageHeader}>
-        <TouchableOpacity 
-          onPress={handleBack} 
+        <TouchableOpacity
+          onPress={handleBack}
           style={styles.backBtn}
           hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
         >
@@ -251,7 +257,12 @@ export default function KasirTransaksi() {
             style={[styles.tab, activeTab === tab && styles.tabActive]}
             onPress={() => setActiveTab(tab)}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === tab && styles.tabTextActive,
+              ]}
+            >
               {tab}
             </Text>
           </TouchableOpacity>
@@ -419,7 +430,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
   },
-  backBtn: { width: 70, justifyContent: 'center' },
+  backBtn: { width: 70, justifyContent: "center" },
   backText: { fontSize: 13, color: "#4B2E2B", fontWeight: "500" },
   headerCenter: { alignItems: "center", gap: 4 },
   tokoName: { fontSize: 18, fontWeight: "bold", color: "#4B2E2B" },
@@ -457,10 +468,25 @@ const styles = StyleSheet.create({
   },
   searchIcon: { fontSize: 16 },
   searchInput: { flex: 1, fontSize: 14, color: "#4B2E2B", paddingVertical: 0 },
-  searchClear: { fontSize: 14, color: "#bbb", fontWeight: "600", paddingLeft: 4 },
-  emptyArea: { height: 300, justifyContent: "center", alignItems: "center", gap: 12 },
+  searchClear: {
+    fontSize: 14,
+    color: "#bbb",
+    fontWeight: "600",
+    paddingLeft: 4,
+  },
+  emptyArea: {
+    height: 300,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
   emptyIcon: { fontSize: 48 },
-  emptyText: { fontSize: 15, color: "#bbb", textAlign: "center", lineHeight: 24 },
+  emptyText: {
+    fontSize: 15,
+    color: "#bbb",
+    textAlign: "center",
+    lineHeight: 24,
+  },
   menuCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -489,7 +515,12 @@ const styles = StyleSheet.create({
   menuInfo: { flex: 1, gap: 2 },
   menuName: { fontSize: 15, fontWeight: "600", color: "#4B2E2B" },
   menuSub: { fontSize: 12, color: "#aaa" },
-  menuHarga: { fontSize: 14, fontWeight: "600", color: "#4B2E2B", marginTop: 4 },
+  menuHarga: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4B2E2B",
+    marginTop: 4,
+  },
   menuStok: { fontSize: 11, fontWeight: "600", marginTop: 2 },
   stokTersedia: { color: "#2E7D32" },
   stokHabis: { color: "#C62828" },

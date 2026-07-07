@@ -1,12 +1,14 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  Alert,
   Image,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -33,6 +35,11 @@ export default function Payment() {
 
   const [metodeBayar, setMetodeBayar] = useState<MetodeBayar>(null);
   const [showStruk, setShowStruk] = useState(false);
+  const [uangDiterima, setUangDiterima] = useState("");
+  const [printLoading, setPrintLoading] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
+  const [showToast, setShowToast] = useState(false);
+
   const [nomorStruk] = useState(() => "INV-" + Date.now().toString().slice(-8));
   const [waktuBayar] = useState(() => {
     const now = new Date();
@@ -45,13 +52,105 @@ export default function Payment() {
     });
   });
 
+  // Hitung kembalian
+  const uangInt = parseInt(uangDiterima.replace(/\D/g, ""), 10) || 0;
+  const kembalian = uangInt - totalHarga;
+  const uangKurang = kembalian < 0;
+  const cashValid = metodeBayar === "Cash" ? uangInt >= totalHarga : true;
+
+  const handleUangChange = (val: string) => {
+    // Format ribuan otomatis
+    const angka = val.replace(/\D/g, "");
+    if (!angka) {
+      setUangDiterima("");
+      return;
+    }
+    const formatted = parseInt(angka, 10).toLocaleString("id-ID");
+    setUangDiterima(formatted);
+  };
+
+  const showToastMsg = (msg: string) => {
+    setToastMsg(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2500);
+  };
+
   const handleBayar = () => {
     if (!metodeBayar) return;
+    if (metodeBayar === "Cash" && !cashValid) return;
     setShowStruk(true);
   };
 
+  const handleCetak = async () => {
+    setPrintLoading(true);
+    try {
+      // Coba import expo-print secara dinamis
+      // Kalau tidak ada, fallback ke alert
+      const expoPrint = await import("expo-print").catch(() => null);
+
+      if (expoPrint) {
+        const htmlStruk = `
+          <html>
+          <head>
+            <style>
+              body { font-family: monospace; width: 300px; margin: 0 auto; font-size: 12px; }
+              h2 { text-align: center; font-size: 16px; margin: 8px 0; }
+              .center { text-align: center; }
+              .row { display: flex; justify-content: space-between; margin: 3px 0; }
+              .divider { border-top: 1px dashed #000; margin: 8px 0; }
+              .total { font-weight: bold; font-size: 14px; }
+            </style>
+          </head>
+          <body>
+            <h2>${namaToko}</h2>
+            <p class="center">${waktuBayar}</p>
+            <p class="center">No: ${nomorStruk}</p>
+            <div class="divider"></div>
+            ${cartList
+              .map(
+                (item) => `
+              <div class="row">
+                <span>${item.namaMenu} x${item.qty}</span>
+                <span>Rp ${(parseInt(item.harga) * item.qty).toLocaleString("id-ID")}</span>
+              </div>`,
+              )
+              .join("")}
+            <div class="divider"></div>
+            <div class="row total">
+              <span>TOTAL</span>
+              <span>Rp ${totalHarga.toLocaleString("id-ID")}</span>
+            </div>
+            ${
+              metodeBayar === "Cash"
+                ? `
+            <div class="row"><span>Bayar</span><span>Rp ${uangDiterima}</span></div>
+            <div class="row"><span>Kembalian</span><span>Rp ${kembalian.toLocaleString("id-ID")}</span></div>`
+                : ""
+            }
+            <div class="divider"></div>
+            <p class="center">Metode: ${metodeBayar}</p>
+            <p class="center">Terima kasih! 🙏</p>
+          </body>
+          </html>
+        `;
+        await expoPrint.printAsync({ html: htmlStruk });
+        showToastMsg("Struk berhasil dikirim ke printer");
+      } else {
+        // Fallback: tampilkan alert jika expo-print belum diinstall
+        Alert.alert(
+          "Info",
+          "Untuk mencetak struk, install expo-print:\nnpx expo install expo-print\n\nAtau hubungkan printer Bluetooth.",
+          [{ text: "OK" }],
+        );
+      }
+    } catch (err) {
+      showToastMsg("Gagal mencetak struk");
+    } finally {
+      setPrintLoading(false);
+    }
+  };
+
   const handleSelesai = async () => {
-    // Kurangi stok setiap item yang dibeli
     const menuList = await getMenuList();
 
     for (const cartItem of cartList) {
@@ -75,9 +174,19 @@ export default function Payment() {
     router.push(`/dashboard?namaToko=${namaToko}`);
   };
 
+  // Tombol bayar aktif?
+  const bayarAktif = !!metodeBayar && cashValid;
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Toast */}
+      {showToast && (
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>{toastMsg}</Text>
+        </View>
+      )}
 
       {/* Area Putih */}
       <View style={styles.topArea}>
@@ -167,6 +276,69 @@ export default function Payment() {
               </View>
             </Pressable>
 
+            {/* Input uang pelanggan — muncul saat pilih Cash */}
+            {metodeBayar === "Cash" && (
+              <View style={styles.cashInputBox}>
+                <Text style={styles.cashInputLabel}>
+                  Uang Diterima dari Pelanggan
+                </Text>
+                <View style={styles.cashInputRow}>
+                  <Text style={styles.cashPrefix}>Rp</Text>
+                  <TextInput
+                    style={styles.cashInput}
+                    placeholder="0"
+                    placeholderTextColor="#bbb"
+                    keyboardType="numeric"
+                    value={uangDiterima}
+                    onChangeText={handleUangChange}
+                  />
+                </View>
+
+                {/* Tombol nominal cepat */}
+                <View style={styles.nominalRow}>
+                  {[5000, 10000, 20000, 50000, 100000].map((nom) => (
+                    <TouchableOpacity
+                      key={nom}
+                      style={styles.nominalBtn}
+                      onPress={() =>
+                        setUangDiterima(nom.toLocaleString("id-ID"))
+                      }
+                    >
+                      <Text style={styles.nominalText}>
+                        {nom >= 1000 ? `${nom / 1000}rb` : nom}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Kembalian */}
+                {uangDiterima !== "" && (
+                  <View
+                    style={[
+                      styles.kembalianBox,
+                      uangKurang
+                        ? styles.kembalianKurang
+                        : styles.kembalianCukup,
+                    ]}
+                  >
+                    {uangKurang ? (
+                      <Text style={styles.kembalianKurangText}>
+                        ⚠ Uang kurang Rp{" "}
+                        {Math.abs(kembalian).toLocaleString("id-ID")}
+                      </Text>
+                    ) : (
+                      <View style={styles.kembalianRow}>
+                        <Text style={styles.kembalianLabel}>Kembalian</Text>
+                        <Text style={styles.kembalianValue}>
+                          Rp {kembalian.toLocaleString("id-ID")}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* QRIS */}
             <Pressable
               style={[
@@ -232,15 +404,19 @@ export default function Payment() {
           </Text>
         </View>
         <TouchableOpacity
-          style={[styles.bayarBtn, !metodeBayar && styles.bayarBtnDisabled]}
+          style={[styles.bayarBtn, !bayarAktif && styles.bayarBtnDisabled]}
           onPress={handleBayar}
-          disabled={!metodeBayar}
+          disabled={!bayarAktif}
           activeOpacity={0.85}
         >
           <Text
-            style={[styles.bayarText, !metodeBayar && styles.bayarTextDisabled]}
+            style={[styles.bayarText, !bayarAktif && styles.bayarTextDisabled]}
           >
-            {metodeBayar ? `Bayar dengan ${metodeBayar}` : "Pilih Metode Dulu"}
+            {!metodeBayar
+              ? "Pilih Metode Dulu"
+              : metodeBayar === "Cash" && !cashValid
+                ? "Uang Kurang"
+                : `Bayar dengan ${metodeBayar}`}
           </Text>
         </TouchableOpacity>
       </View>
@@ -308,7 +484,7 @@ export default function Payment() {
 
             <View style={styles.dashedLine} />
 
-            {/* Total */}
+            {/* Total + Kembalian (jika Cash) */}
             <View style={styles.strukTotalRow}>
               <Text style={styles.strukTotalLabel}>TOTAL</Text>
               <Text style={styles.strukTotalValue}>
@@ -316,18 +492,56 @@ export default function Payment() {
               </Text>
             </View>
 
+            {metodeBayar === "Cash" && uangDiterima !== "" && (
+              <>
+                <View style={[styles.infoRow, { marginTop: 4 }]}>
+                  <Text style={styles.infoKey}>Bayar</Text>
+                  <Text style={styles.infoVal}>Rp {uangDiterima}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoKey, { color: "#4B2E2B" }]}>
+                    Kembalian
+                  </Text>
+                  <Text
+                    style={[
+                      styles.infoVal,
+                      { color: "#4B2E2B", fontWeight: "700" },
+                    ]}
+                  >
+                    Rp {kembalian.toLocaleString("id-ID")}
+                  </Text>
+                </View>
+              </>
+            )}
+
             <Text style={styles.strukFooter}>
               Selamat menikmati pesanan Anda 🙏
             </Text>
 
-            {/* Tombol Selesai */}
-            <TouchableOpacity
-              style={styles.selesaiBtn}
-              onPress={handleSelesai}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.selesaiText}>Selesai</Text>
-            </TouchableOpacity>
+            {/* Tombol Cetak + Selesai */}
+            <View style={styles.btnRow}>
+              {/* Tombol Cetak Struk */}
+              <TouchableOpacity
+                style={styles.cetakBtn}
+                onPress={handleCetak}
+                activeOpacity={0.75}
+                disabled={printLoading}
+              >
+                <Text style={styles.cetakIcon}>🖨</Text>
+                <Text style={styles.cetakText}>
+                  {printLoading ? "Mencetak..." : "Cetak Struk"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Tombol Selesai */}
+              <TouchableOpacity
+                style={styles.selesaiBtn}
+                onPress={handleSelesai}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.selesaiText}>Selesai</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -337,6 +551,20 @@ export default function Payment() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#4B2E2B" },
+
+  // Toast
+  toast: {
+    position: "absolute",
+    top: 60,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.75)",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    zIndex: 999,
+  },
+  toastText: { color: "#fff", fontSize: 13 },
+
   topArea: {
     flex: 1,
     backgroundColor: "#fff",
@@ -424,6 +652,78 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "#4B2E2B",
   },
+
+  // ===== CASH INPUT =====
+  cashInputBox: {
+    backgroundColor: "#fdf8f6",
+    borderRadius: 14,
+    padding: 14,
+    marginTop: -4,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: "#e8d8d4",
+  },
+  cashInputLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4B2E2B",
+    marginBottom: 8,
+  },
+  cashInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#d4b8b0",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  cashPrefix: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#4B2E2B",
+    marginRight: 6,
+  },
+  cashInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#4B2E2B",
+    padding: 0,
+  },
+  nominalRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 10,
+  },
+  nominalBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#d4b8b0",
+  },
+  nominalText: { fontSize: 12, color: "#4B2E2B", fontWeight: "600" },
+  kembalianBox: {
+    borderRadius: 10,
+    padding: 10,
+  },
+  kembalianCukup: { backgroundColor: "#e8f5e9" },
+  kembalianKurang: { backgroundColor: "#fff3e0" },
+  kembalianRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  kembalianLabel: { fontSize: 13, color: "#2e7d32", fontWeight: "600" },
+  kembalianValue: { fontSize: 16, color: "#2e7d32", fontWeight: "800" },
+  kembalianKurangText: { fontSize: 13, color: "#e65100", fontWeight: "600" },
+
+  // QRIS
   qrisBox: {
     backgroundColor: "#f8f9fb",
     borderRadius: 16,
@@ -450,6 +750,8 @@ const styles = StyleSheet.create({
   },
   qrText: { fontSize: 80, color: "#4B2E2B" },
   qrisHint: { fontSize: 12, color: "#aaa" },
+
+  // Bottom
   bottomSheet: {
     backgroundColor: "#4B2E2B",
     padding: 24,
@@ -472,6 +774,8 @@ const styles = StyleSheet.create({
   bayarBtnDisabled: { backgroundColor: "#2a2323ff" },
   bayarText: { color: "#4B2E2B", fontSize: 16, fontWeight: "600" },
   bayarTextDisabled: { color: "#fff" },
+
+  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -547,9 +851,30 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 20,
   },
+
+  // Tombol row bawah struk
+  btnRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  cetakBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "#4B2E2B",
+    backgroundColor: "#fff",
+  },
+  cetakIcon: { fontSize: 16 },
+  cetakText: { color: "#4B2E2B", fontSize: 14, fontWeight: "600" },
   selesaiBtn: {
+    flex: 2,
     backgroundColor: "#4B2E2B",
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 999,
     alignItems: "center",
   },

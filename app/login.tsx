@@ -22,11 +22,31 @@ export default function PinLoginScreen() {
 
   const shake = () => {
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -10,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 8,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -8,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 0,
+        duration: 60,
+        useNativeDriver: true,
+      }),
     ]).start();
   };
 
@@ -60,7 +80,11 @@ export default function PinLoginScreen() {
     } else {
       shake();
       setPin("");
-      Alert.alert("PIN Salah", "PIN yang kamu masukkan tidak valid.\nCoba lagi.", [{ text: "OK" }]);
+      Alert.alert(
+        "PIN Salah",
+        "PIN yang kamu masukkan tidak valid.\nCoba lagi.",
+        [{ text: "OK" }],
+      );
     }
 
     setLoading(false);
@@ -74,9 +98,14 @@ export default function PinLoginScreen() {
         <Text style={styles.appTitle}>Kasir 2.0</Text>
         <Text style={styles.subtitle}>Masukkan PIN untuk masuk</Text>
 
-        <Animated.View style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}>
+        <Animated.View
+          style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}
+        >
           {[0, 1, 2, 3].map((i) => (
-            <View key={i} style={[styles.dot, pin.length > i && styles.dotFilled]} />
+            <View
+              key={i}
+              style={[styles.dot, pin.length > i && styles.dotFilled]}
+            />
           ))}
         </Animated.View>
 
@@ -125,7 +154,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 20,
   },
-  appTitle: { fontSize: 26, fontWeight: "700", color: "#4B2E2B", letterSpacing: 0.5 },
+  appTitle: {
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#4B2E2B",
+    letterSpacing: 0.5,
+  },
   subtitle: { fontSize: 13, color: "#999", marginTop: -8 },
   dotsRow: { flexDirection: "row", gap: 18, marginVertical: 4 },
   dot: {
@@ -157,7 +191,7 @@ const styles = StyleSheet.create({
   hintRow: { flexDirection: "row", gap: 10, marginTop: 4 },
   hintBadge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 999 },
   badgeOwner: { backgroundColor: "#4B2E2B" },
-  badgeKasir: { backgroundColor: "#7a5c59" },
+  badgeKasir: { backgroundColor: "#4B2E2B" },
   hintText: { color: "#fff", fontSize: 12, fontWeight: "500" },
   hintCaption: { fontSize: 11, color: "#bbb", marginTop: -8 },
   bottomSheet: {
@@ -168,7 +202,12 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     alignItems: "center",
   },
-  recapTitle: { fontSize: 28, fontWeight: "bold", color: "#fff", marginBottom: 8 },
+  recapTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 8,
+  },
   recapSubtitle: { fontSize: 13, color: "#fff", textAlign: "center" },
   bold: { fontWeight: "bold", color: "#fff" },
 });

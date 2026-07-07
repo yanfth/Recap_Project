@@ -27,10 +27,10 @@ export default function HomeScreen() {
   };
 
   const handleLanjut = async () => {
-  if (namaToko.trim() === "") return;
-  await AsyncStorage.setItem("nama_toko", namaToko.trim()); // ← simpan
-  router.push(`/dashboard?namaToko=${namaToko}`);
-};
+    if (namaToko.trim() === "") return;
+    await AsyncStorage.setItem("nama_toko", namaToko.trim()); // ← simpan
+    router.push(`/dashboard?namaToko=${namaToko}`);
+  };
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderBottomWidth: 1.5,
-    borderBottomColor: "#4B2E2B",
+    borderBottomColor: "#c09070ff",
     paddingVertical: 8,
     fontSize: 15,
     color: "#4B2E2B",
