@@ -1,24 +1,34 @@
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
 export default function PengaturanPinScreen() {
   const router = useRouter();
   const { setPins, ownerPin, kasirPin } = useAuth();
+  const params = useLocalSearchParams<{ mode?: string; ownerPin?: string }>();
 
+  const mode = params.mode ?? "ganti"; // "setup-owner" | "setup-kasir" | "ganti"
+  const isSetupOwner = mode === "setup-owner";
+  const isSetupKasir = mode === "setup-kasir";
+  const isSetupFlow = isSetupOwner || isSetupKasir;
+
+  // ── Mode "ganti" (perilaku lama, tidak berubah) ──
   const [newOwnerPin, setNewOwnerPin] = useState("");
   const [newKasirPin, setNewKasirPin] = useState("");
+
+  // ── Mode setup (satu input per step) ──
+  const [setupPin, setSetupPin] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSimpan = async () => {
+  const handleSimpanGanti = async () => {
     if (newOwnerPin.length !== 4 || newKasirPin.length !== 4) {
       Alert.alert("PIN Tidak Valid", "Kedua PIN harus terdiri dari 4 angka.");
       return;
@@ -27,7 +37,6 @@ export default function PengaturanPinScreen() {
       Alert.alert("PIN Sama", "PIN Owner dan PIN Kasir tidak boleh sama.");
       return;
     }
-
     setLoading(true);
     try {
       await setPins(newOwnerPin, newKasirPin);
@@ -40,6 +49,86 @@ export default function PengaturanPinScreen() {
     setLoading(false);
   };
 
+  const handleLanjutOwner = () => {
+    if (setupPin.length !== 4) {
+      Alert.alert("PIN Tidak Valid", "PIN harus terdiri dari 4 angka.");
+      return;
+    }
+    // bawa PIN owner ke step kasir lewat query param
+    router.push(`/pengaturan-pin?mode=setup-kasir&ownerPin=${setupPin}`);
+  };
+
+  const handleSelesaiKasir = async () => {
+    const ownerPinFromParam = params.ownerPin ?? "";
+    if (setupPin.length !== 4) {
+      Alert.alert("PIN Tidak Valid", "PIN harus terdiri dari 4 angka.");
+      return;
+    }
+    if (setupPin === ownerPinFromParam) {
+      Alert.alert("PIN Sama", "PIN Kasir tidak boleh sama dengan PIN Owner.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await setPins(ownerPinFromParam, setupPin);
+      router.replace("/home"); // ⬅️ sesuaikan tujuan akhir setup (dashboard/home)
+    } catch (e: any) {
+      Alert.alert("Gagal", e.message ?? "Terjadi kesalahan.");
+    }
+    setLoading(false);
+  };
+
+  // ── Render: mode setup ──
+  if (isSetupFlow) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen
+          options={{
+            headerShown: true,
+            title: isSetupOwner ? "Setup PIN Owner" : "Setup PIN Kasir",
+            headerBackVisible: false, // gak boleh skip alur setup
+          }}
+        />
+        <View style={styles.content}>
+          <Text style={styles.sectionLabel}>
+            {isSetupOwner ? "Buat PIN Owner (👑)" : "Buat PIN Kasir (🧾)"}
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="4 digit angka"
+            placeholderTextColor="#aaa"
+            keyboardType="numeric"
+            maxLength={4}
+            secureTextEntry
+            value={setupPin}
+            onChangeText={setSetupPin}
+            underlineColorAndroid="transparent"
+          />
+          <Text style={styles.hint}>
+            {isSetupOwner
+              ? "⚠️ PIN ini akan dipakai untuk masuk sebagai Owner."
+              : "⚠️ PIN Kasir tidak boleh sama dengan PIN Owner."}
+          </Text>
+
+          <TouchableOpacity
+            style={[
+              styles.button,
+              (setupPin.length < 4 || loading) && styles.buttonDisabled,
+            ]}
+            onPress={isSetupOwner ? handleLanjutOwner : handleSelesaiKasir}
+            disabled={setupPin.length < 4 || loading}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? "Menyimpan..." : isSetupOwner ? "Lanjut" : "Selesai"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ── Render: mode "ganti" (perilaku lama) ──
   return (
     <View style={styles.container}>
       <Stack.Screen
@@ -49,7 +138,6 @@ export default function PengaturanPinScreen() {
           headerBackTitle: "Kembali",
         }}
       />
-
       <View style={styles.content}>
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>PIN Aktif Sekarang</Text>
@@ -100,7 +188,7 @@ export default function PengaturanPinScreen() {
             (newOwnerPin.length < 4 || newKasirPin.length < 4 || loading) &&
               styles.buttonDisabled,
           ]}
-          onPress={handleSimpan}
+          onPress={handleSimpanGanti}
           disabled={newOwnerPin.length < 4 || newKasirPin.length < 4 || loading}
           activeOpacity={0.8}
         >
@@ -112,6 +200,8 @@ export default function PengaturanPinScreen() {
     </View>
   );
 }
+
+// styles: sama persis seperti sebelumnya, tidak berubah
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },

@@ -1,24 +1,22 @@
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, View } from "react-native";
+import { useAuth } from "./context/AuthContext";
 
 export default function SplashScreen() {
   const router = useRouter();
+  const { isSetupDone } = useAuth();
 
-  // Animasi untuk huruf R
   const rScale = useRef(new Animated.Value(0)).current;
   const rOpacity = useRef(new Animated.Value(0)).current;
-
-  // Animasi untuk tulisan "ecap"
   const ecapOpacity = useRef(new Animated.Value(0)).current;
   const ecapTranslateX = useRef(new Animated.Value(-20)).current;
-
-  // Animasi fade out keseluruhan
   const containerOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    // Jalankan animasi dulu, BARU cek status user setelah selesai
     Animated.sequence([
-      // 1. Huruf R muncul dengan scale
+      // 1. Huruf R muncul
       Animated.parallel([
         Animated.spring(rScale, {
           toValue: 1,
@@ -33,10 +31,10 @@ export default function SplashScreen() {
         }),
       ]),
 
-      // 2. Jeda sebentar
+      // 2. Jeda
       Animated.delay(200),
 
-      // 3. Tulisan "ecap" keluar dari R
+      // 3. "ecap" muncul
       Animated.parallel([
         Animated.timing(ecapOpacity, {
           toValue: 1,
@@ -51,20 +49,26 @@ export default function SplashScreen() {
         }),
       ]),
 
-      // 4. Tahan sebentar
+      // 4. Tahan
       Animated.delay(800),
 
-      // 5. Fade out semua
+      // 5. Fade out
       Animated.timing(containerOpacity, {
         toValue: 0,
         duration: 500,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Pindah ke halaman utama setelah animasi selesai
-      router.replace("/");
+      // Setelah animasi selesai, cek status setup PIN dari AuthContext
+      if (isSetupDone) {
+        // User lama — langsung ke login
+        router.replace("/login");
+      } else {
+        // User baru — ke Welcome (index)
+        router.replace("/");
+      }
     });
-  }, []);
+  }, [isSetupDone]);
 
   return (
     <View style={styles.container}>
@@ -72,7 +76,6 @@ export default function SplashScreen() {
 
       <Animated.View style={{ opacity: containerOpacity }}>
         <View style={styles.logoRow}>
-          {/* Huruf R */}
           <Animated.Text
             style={[
               styles.letterR,
@@ -85,7 +88,6 @@ export default function SplashScreen() {
             R
           </Animated.Text>
 
-          {/* Tulisan "ecap" */}
           <Animated.Text
             style={[
               styles.letterEcap,
@@ -99,7 +101,6 @@ export default function SplashScreen() {
           </Animated.Text>
         </View>
 
-        {/* Tagline */}
         <Animated.Text style={[styles.tagline, { opacity: ecapOpacity }]}>
           Lebih Mudah Berjualan
         </Animated.Text>

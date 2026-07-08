@@ -1,8 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 type Role = "owner" | "kasir" | null;
 
 interface AuthContextType {
@@ -12,36 +10,33 @@ interface AuthContextType {
   setPins: (ownerPin: string, kasirPin: string) => Promise<void>;
   ownerPin: string;
   kasirPin: string;
+  isSetupDone: boolean; // ⬅️ baru
 }
-
-// ─── Default PIN ──────────────────────────────────────────────────────────────
-// Bisa diubah owner kapan saja lewat fitur pengaturan PIN
 
 const DEFAULT_OWNER_PIN = "1234";
 const DEFAULT_KASIR_PIN = "0000";
 
-// ─── Context ─────────────────────────────────────────────────────────────────
-
 const AuthContext = createContext<AuthContextType | null>(null);
-
-// ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role>(null);
   const [ownerPin, setOwnerPin] = useState(DEFAULT_OWNER_PIN);
   const [kasirPin, setKasirPin] = useState(DEFAULT_KASIR_PIN);
+  const [isSetupDone, setIsSetupDone] = useState(false); // ⬅️ baru
 
-  // Load PIN tersimpan saat app pertama dibuka
   useEffect(() => {
-    AsyncStorage.multiGet(["ownerPin", "kasirPin"]).then((pairs) => {
-      const savedOwner = pairs[0][1];
-      const savedKasir = pairs[1][1];
-      if (savedOwner) setOwnerPin(savedOwner);
-      if (savedKasir) setKasirPin(savedKasir);
-    });
+    AsyncStorage.multiGet(["ownerPin", "kasirPin", "setupDone"]).then(
+      (pairs) => {
+        const savedOwner = pairs[0][1];
+        const savedKasir = pairs[1][1];
+        const savedSetupDone = pairs[2][1];
+        if (savedOwner) setOwnerPin(savedOwner);
+        if (savedKasir) setKasirPin(savedKasir);
+        setIsSetupDone(savedSetupDone === "true"); // ⬅️ baru
+      },
+    );
   }, []);
 
-  // Login — cocokkan PIN, return role atau "invalid"
   const login = async (pin: string): Promise<"owner" | "kasir" | "invalid"> => {
     if (pin === ownerPin) {
       setRole("owner");
@@ -54,10 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return "invalid";
   };
 
-  // Logout — kembali ke login screen
   const logout = () => setRole(null);
 
-  // Ubah PIN (hanya owner yang bisa akses fitur ini)
   const setPins = async (newOwner: string, newKasir: string) => {
     if (newOwner === newKasir) {
       throw new Error("PIN Owner dan Kasir tidak boleh sama!");
@@ -68,21 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.multiSet([
       ["ownerPin", newOwner],
       ["kasirPin", newKasir],
+      ["setupDone", "true"], // ⬅️ baru — tandai setup selesai
     ]);
     setOwnerPin(newOwner);
     setKasirPin(newKasir);
+    setIsSetupDone(true); // ⬅️ baru
   };
 
   return (
     <AuthContext.Provider
-      value={{ role, login, logout, setPins, ownerPin, kasirPin }}
+      value={{ role, login, logout, setPins, ownerPin, kasirPin, isSetupDone }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);

@@ -161,7 +161,7 @@ export default function Payment() {
       }
     }
 
-    addToHistory({
+    await addToHistory({
       nomorStruk,
       namaToko: namaToko as string,
       items: cartList,

@@ -53,7 +53,7 @@ export default function History() {
 
   useFocusEffect(
     useCallback(() => {
-      setHistoryList(getHistory());
+      getHistory().then((data) => setHistoryList(data));
 
       // Load kas — hanya pakai nilainya jika kasDisimpan = true
       loadKas().then(({ modalAwal: saved, kasDisimpan: isSaved }) => {

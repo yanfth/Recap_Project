@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -18,7 +18,22 @@ export default function PinLoginScreen() {
   const { login } = useAuth();
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Cek apakah user baru (belum pernah lihat welcome screen)
+    AsyncStorage.getItem("has_seen_welcome").then((val) => {
+      // Kalau has_seen_welcome ada tapi pin belum di-setup,
+      // atau baru saja dari onboarding → tampilkan recap
+      AsyncStorage.getItem("pin_sudah_disetup").then((pinSetup) => {
+        if (!pinSetup) {
+          // Baru selesai onboarding, belum setup pin
+          setIsNewUser(true);
+        }
+      });
+    });
+  }, []);
 
   const shake = () => {
     Animated.sequence([
@@ -134,12 +149,15 @@ export default function PinLoginScreen() {
         <Text style={styles.hintCaption}>PIN berbeda untuk setiap role</Text>
       </View>
 
-      <View style={styles.bottomSheet}>
-        <Text style={styles.recapTitle}>Recap</Text>
-        <Text style={styles.recapSubtitle}>
-          Lebih Mudah Berjualan Dengan <Text style={styles.bold}>Recap</Text>
-        </Text>
-      </View>
+      {/* BottomSheet Recap — hanya tampil untuk user baru */}
+      {isNewUser && (
+        <View style={styles.bottomSheet}>
+          <Text style={styles.recapTitle}>Recap</Text>
+          <Text style={styles.recapSubtitle}>
+            Lebih Mudah Berjualan Dengan <Text style={styles.bold}>Recap</Text>
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

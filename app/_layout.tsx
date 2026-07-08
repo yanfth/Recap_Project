@@ -1,35 +1,21 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
-import { Stack, useRouter } from "expo-router";
+import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import { AuthProvider } from "./context/AuthContext";
 
+// Beritahu Expo Router bahwa layar pertama adalah "splash"
 export const unstable_settings = {
-  anchor: "splash",
+  initialRouteName: "splash",
 };
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const router = useRouter();
-  const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    const checkFirstTime = async () => {
-      const alreadySeen = await AsyncStorage.getItem("has_seen_welcome");
-      if (alreadySeen) {
-        router.replace("/login");
-      }
-      setChecked(true);
-    };
-    checkFirstTime();
-  }, []);
 
   return (
     <AuthProvider>
@@ -40,6 +26,9 @@ export default function RootLayout() {
             animation: "fade",
           }}
         >
+          {/* Splash — selalu jadi layar pertama */}
+          <Stack.Screen name="splash" options={{ headerShown: false }} />
+
           {/* Auth screens */}
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />

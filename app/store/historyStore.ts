@@ -1,4 +1,6 @@
-// store/historyStore.ts
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const HISTORY_KEY = "history_list";
 
 export type HistoryItem = {
   id: string;
@@ -17,18 +19,32 @@ export type HistoryOrder = {
   waktu: string; // ISO string
 };
 
-// In-memory store (persists during app session)
-let historyList: HistoryOrder[] = [];
-
-export const addToHistory = (order: HistoryOrder): void => {
-  // Newest first
-  historyList = [order, ...historyList];
+// Ambil semua history dari AsyncStorage
+export const getHistory = async (): Promise<HistoryOrder[]> => {
+  try {
+    const data = await AsyncStorage.getItem(HISTORY_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
 };
 
-export const getHistory = (): HistoryOrder[] => {
-  return historyList;
+// Tambah transaksi baru (newest first)
+export const addToHistory = async (order: HistoryOrder): Promise<void> => {
+  try {
+    const current = await getHistory();
+    const updated = [order, ...current];
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  } catch (error) {
+    console.error("Gagal menyimpan history:", error);
+  }
 };
 
-export const clearHistory = (): void => {
-  historyList = [];
+// Hapus semua history
+export const clearHistory = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(HISTORY_KEY);
+  } catch (error) {
+    console.error("Gagal menghapus history:", error);
+  }
 };
