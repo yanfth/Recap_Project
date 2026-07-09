@@ -1,9 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,25 +16,10 @@ const BUTTONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
 
 export default function PinLoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isSetupDone } = useAuth();
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isNewUser, setIsNewUser] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Cek apakah user baru (belum pernah lihat welcome screen)
-    AsyncStorage.getItem("has_seen_welcome").then((val) => {
-      // Kalau has_seen_welcome ada tapi pin belum di-setup,
-      // atau baru saja dari onboarding → tampilkan recap
-      AsyncStorage.getItem("pin_sudah_disetup").then((pinSetup) => {
-        if (!pinSetup) {
-          // Baru selesai onboarding, belum setup pin
-          setIsNewUser(true);
-        }
-      });
-    });
-  }, []);
 
   const shake = () => {
     Animated.sequence([
@@ -109,6 +95,27 @@ export default function PinLoginScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
+      {/* Popup untuk user baru — arahkan langsung buat PIN sendiri */}
+      <Modal visible={!isSetupDone} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalEmoji}>🔐</Text>
+            <Text style={styles.modalTitle}>Selamat Datang di Recap!</Text>
+            <Text style={styles.modalDesc}>
+              Sepertinya ini pertama kali kamu membuka aplikasi. Yuk buat PIN
+              sendiri untuk Owner dan Kasir — bebas, terserah kamu.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => router.replace("/pengaturan-pin?mode=setup-owner")}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalButtonText}>Buat PIN Sekarang</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.topArea}>
         <Text style={styles.appTitle}>Kasir 2.0</Text>
         <Text style={styles.subtitle}>Masukkan PIN untuk masuk</Text>
@@ -130,7 +137,7 @@ export default function PinLoginScreen() {
               key={i}
               style={[styles.numBtn, btn === "" && styles.numBtnHidden]}
               onPress={() => handlePress(btn)}
-              disabled={btn === "" || loading}
+              disabled={btn === "" || loading || !isSetupDone}
               activeOpacity={0.6}
             >
               <Text style={styles.numText}>{btn}</Text>
@@ -149,8 +156,7 @@ export default function PinLoginScreen() {
         <Text style={styles.hintCaption}>PIN berbeda untuk setiap role</Text>
       </View>
 
-      {/* BottomSheet Recap — hanya tampil untuk user baru */}
-      {isNewUser && (
+      {!isSetupDone && (
         <View style={styles.bottomSheet}>
           <Text style={styles.recapTitle}>Recap</Text>
           <Text style={styles.recapSubtitle}>
@@ -228,4 +234,45 @@ const styles = StyleSheet.create({
   },
   recapSubtitle: { fontSize: 13, color: "#fff", textAlign: "center" },
   bold: { fontWeight: "bold", color: "#fff" },
+
+  // ── Modal / Popup ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalBox: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 28,
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "center",
+  },
+  modalEmoji: { fontSize: 40, marginBottom: 8 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#4B2E2B",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalDesc: {
+    fontSize: 13,
+    color: "#777",
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  modalButton: {
+    backgroundColor: "#4B2E2B",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 999,
+    width: "100%",
+    alignItems: "center",
+  },
+  modalButtonText: { color: "#fff", fontSize: 15, fontWeight: "600" },
 });

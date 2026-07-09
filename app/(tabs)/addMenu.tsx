@@ -23,7 +23,10 @@ export default function AddMenu() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
-    Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
   const onPressOut = () =>
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
 
@@ -64,7 +67,7 @@ export default function AddMenu() {
     setTimeout(() => {
       Alert.alert(
         "Menu Ditambahkan ✅",
-        `"${namaMenu.trim()}" berhasil disimpan.\nTambahkan stok di menu "Tambah Stok".`
+        `"${namaMenu.trim()}" berhasil disimpan.\nTambahkan stok di menu "Tambah Stok".`,
       );
     }, 300);
   };
@@ -204,6 +207,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   buttonDisabled: { backgroundColor: "#aaa" },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "500" },
+  buttonText: { color: "#ffffffff", fontSize: 16, fontWeight: "500" },
   bottomSheet: { height: 80, backgroundColor: "#4B2E2B" },
 });

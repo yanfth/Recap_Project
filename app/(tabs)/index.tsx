@@ -11,14 +11,15 @@ export default function WelcomeScreen() {
   };
 
   return (
+    // Delete This Stage if not use
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.imageArea}>
         <Image
-        // source={require("../../assets/images/Drink.png")}
-        // style={styles.welcomeImage}
-        // resizeMode="contain"
+          source={require("../../assets/images/landing_Page.png")}
+          style={styles.landingImage}
+          resizeMode="contain"
         />
       </View>
 
@@ -54,6 +55,12 @@ const styles = StyleSheet.create({
   welcomeImage: {
     width: "80%",
     height: "80%",
+  },
+  // Delete This Stage if not use
+  landingImage: {
+    width: "80%",
+    height: 250,
+    alignSelf: "center",
   },
   bottomSheet: {
     backgroundColor: "#4B2E2B",

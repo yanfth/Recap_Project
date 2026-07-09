@@ -10,19 +10,16 @@ interface AuthContextType {
   setPins: (ownerPin: string, kasirPin: string) => Promise<void>;
   ownerPin: string;
   kasirPin: string;
-  isSetupDone: boolean; // ⬅️ baru
+  isSetupDone: boolean;
 }
-
-const DEFAULT_OWNER_PIN = "1234";
-const DEFAULT_KASIR_PIN = "0000";
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role>(null);
-  const [ownerPin, setOwnerPin] = useState(DEFAULT_OWNER_PIN);
-  const [kasirPin, setKasirPin] = useState(DEFAULT_KASIR_PIN);
-  const [isSetupDone, setIsSetupDone] = useState(false); // ⬅️ baru
+  const [ownerPin, setOwnerPin] = useState(""); // ⬅️ kosong, bukan default lagi
+  const [kasirPin, setKasirPin] = useState(""); // ⬅️ kosong, bukan default lagi
+  const [isSetupDone, setIsSetupDone] = useState(false);
 
   useEffect(() => {
     AsyncStorage.multiGet(["ownerPin", "kasirPin", "setupDone"]).then(
@@ -32,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const savedSetupDone = pairs[2][1];
         if (savedOwner) setOwnerPin(savedOwner);
         if (savedKasir) setKasirPin(savedKasir);
-        setIsSetupDone(savedSetupDone === "true"); // ⬅️ baru
+        setIsSetupDone(savedSetupDone === "true");
       },
     );
   }, []);
@@ -61,11 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.multiSet([
       ["ownerPin", newOwner],
       ["kasirPin", newKasir],
-      ["setupDone", "true"], // ⬅️ baru — tandai setup selesai
+      ["setupDone", "true"],
     ]);
     setOwnerPin(newOwner);
     setKasirPin(newKasir);
-    setIsSetupDone(true); // ⬅️ baru
+    setIsSetupDone(true);
   };
 
   return (

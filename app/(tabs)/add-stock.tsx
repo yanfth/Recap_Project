@@ -1,13 +1,13 @@
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useStock } from "../hooks/useStock";
 
@@ -47,6 +47,8 @@ export default function AddStockScreen() {
           headerShown: true,
           title: "Tambah Stok",
           headerBackTitle: "Kembali",
+          headerTitleStyle: { color: "#ffffffff" },
+          headerTintColor: "#ffffffff",
         }}
       />
 

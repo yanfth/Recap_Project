@@ -17,7 +17,6 @@ export type Produk = {
   kategori: string;
 };
 
-// Konversi MenuItem (menuStore) → Produk (format lama useStock)
 const toMenuItem = (p: Produk): Omit<MenuItem, "id"> => ({
   namaMenu: p.nama,
   harga: String(p.harga),
@@ -45,11 +44,10 @@ export function useStock() {
     setLoading(false);
   }, []);
 
-  // Auto-reload setiap kali halaman difokus
   useFocusEffect(
     useCallback(() => {
       reload();
-    }, [reload])
+    }, [reload]),
   );
 
   const tambahProduk = async (data: Omit<Produk, "id">) => {
@@ -64,10 +62,33 @@ export function useStock() {
     await reload();
   };
 
+  // ⬅️ BARU: edit nama, harga, kategori, atau stok produk
+  const editProduk = async (
+    id: string,
+    data: Partial<Omit<Produk, "id" | "modal">>,
+  ) => {
+    const payload: Partial<MenuItem> = {};
+    if (data.nama !== undefined) payload.namaMenu = data.nama;
+    if (data.harga !== undefined) payload.harga = String(data.harga);
+    if (data.kategori !== undefined) payload.kategori = data.kategori;
+    if (data.stok !== undefined) payload.stok = data.stok;
+
+    await editMenuItem(id, payload);
+    await reload();
+  };
+
   const hapusProduk = async (id: string) => {
     await deleteMenuItem(id);
     await reload();
   };
 
-  return { produkList, loading, tambahProduk, tambahStok, hapusProduk, reload };
+  return {
+    produkList,
+    loading,
+    tambahProduk,
+    tambahStok,
+    editProduk, // ⬅️ BARU
+    hapusProduk,
+    reload,
+  };
 }
