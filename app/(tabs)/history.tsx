@@ -5,8 +5,10 @@ import {
   useRouter,
 } from "expo-router";
 import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
 import { useCallback, useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -23,18 +25,6 @@ import {
 import * as XLSX from "xlsx";
 import { getHistory, HistoryOrder } from "../store/historyStore";
 import { loadKas, resetKas, saveKas } from "../store/kasStore";
-
-interface IFileSystem {
-  cacheDirectory: string | null;
-  writeAsStringAsync: (
-    fileUri: string,
-    contents: string,
-    options?: { encoding?: string },
-  ) => Promise<void>;
-  EncodingType: { Base64: string; UTF8: string };
-}
-const FileSystem: IFileSystem | null =
-  Platform.OS !== "web" ? require("expo-file-system") : null;
 
 export default function History() {
   const { namaToko } = useLocalSearchParams();
@@ -195,7 +185,10 @@ export default function History() {
   };
 
   const handleExportNative = async () => {
-    if (!FileSystem) return;
+    if (!FileSystem) {
+      Alert.alert("Error", "Modul FileSystem tidak tersedia di platform ini.");
+      return;
+    }
     try {
       const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
       const base64 = XLSX.write(buildWorkbook(), {
@@ -203,21 +196,34 @@ export default function History() {
         bookType: "xlsx",
       });
       const cacheDir = FileSystem.cacheDirectory ?? "";
+      if (!cacheDir) {
+        Alert.alert("Error", "cacheDirectory tidak tersedia.");
+        return;
+      }
       const filePath = `${cacheDir}Riwayat_${tokoName}_${Date.now()}.xlsx`;
       await FileSystem.writeAsStringAsync(filePath, base64, {
         encoding: FileSystem.EncodingType.Base64,
       });
       const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(filePath, {
-          mimeType:
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          dialogTitle: `Ekspor Riwayat - ${tokoName}`,
-          UTI: "com.microsoft.excel.xlsx",
-        });
+      if (!isAvailable) {
+        Alert.alert(
+          "Tidak Tersedia",
+          "Fitur share tidak tersedia di perangkat ini.",
+        );
+        return;
       }
-    } catch (e) {
+      await Sharing.shareAsync(filePath, {
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        dialogTitle: `Ekspor Riwayat - ${tokoName}`,
+        UTI: "com.microsoft.excel.xlsx",
+      });
+    } catch (e: any) {
       console.error(e);
+      Alert.alert(
+        "Export Gagal",
+        e?.message ?? "Terjadi kesalahan saat export.",
+      );
     }
   };
 

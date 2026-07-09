@@ -58,8 +58,8 @@ const styles = StyleSheet.create({
   },
   // Delete This Stage if not use
   landingImage: {
-    width: "80%",
-    height: 250,
+    width: "100%",
+    height: 350,
     alignSelf: "center",
   },
   bottomSheet: {

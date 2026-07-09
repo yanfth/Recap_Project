@@ -117,7 +117,7 @@ export default function PinLoginScreen() {
       </Modal>
 
       <View style={styles.topArea}>
-        <Text style={styles.appTitle}>Kasir 2.0</Text>
+        <Text style={styles.appTitle}>Recap</Text>
         <Text style={styles.subtitle}>Masukkan PIN untuk masuk</Text>
 
         <Animated.View
@@ -153,7 +153,7 @@ export default function PinLoginScreen() {
             <Text style={styles.hintText}>🧾 Kasir</Text>
           </View>
         </View>
-        <Text style={styles.hintCaption}>PIN berbeda untuk setiap role</Text>
+        <Text style={styles.hintCaption}>PIN owner dan kasir tidak sama</Text>
       </View>
 
       {!isSetupDone && (
