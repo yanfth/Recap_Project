@@ -1,13 +1,12 @@
 {
   "expo": {
     "name": "Kasir2.0",
-    "slug": "Kasir2.0",
+    "slug": "Kasir2-0",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "kasir20",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -18,7 +17,6 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.Kasir2.x0"
     },
@@ -41,11 +39,16 @@
         }
       ],
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "assetBundlePatterns": [
+      "**/*",
+      "assets/Videos/*"
+    ]
   }
 }
