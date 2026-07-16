@@ -9,11 +9,6 @@ import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 import { AuthProvider } from "./context/AuthContext";
 
-// Beritahu Expo Router bahwa layar pertama adalah "splash"
-export const unstable_settings = {
-  initialRouteName: "splash",
-};
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
@@ -26,10 +21,7 @@ export default function RootLayout() {
             animation: "fade",
           }}
         >
-          {/* Splash — selalu jadi layar pertama */}
-          <Stack.Screen name="splash" options={{ headerShown: false }} />
-
-          {/* Auth screens */}
+          {/* Splash (sekarang index) / Auth screens */}
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
 

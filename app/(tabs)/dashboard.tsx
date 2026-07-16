@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   Alert,
   FlatList,
+  Image,
   Modal,
   StyleSheet,
   Text,
@@ -133,7 +134,12 @@ export default function DashboardScreen() {
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.logoutText}>🚪 Keluar</Text>
+          <Image
+            source={require("../../assets/images/Logout.png")}
+            style={styles.logoutIcon}
+            resizeMode="contain"
+          />
+          <Text style={styles.logoutText}>Keluar</Text>
         </TouchableOpacity>
       </View>
 
@@ -402,6 +408,13 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.4)",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  logoutIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 6,
   },
   logoutText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   menuGrid: { flexDirection: "row", flexWrap: "wrap", padding: 16, gap: 12 },

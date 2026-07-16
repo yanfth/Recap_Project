@@ -280,7 +280,7 @@ export default function History() {
           <TouchableOpacity onPress={() => router.back()} style={{ width: 40 }}>
             <Image
               source={require("../../assets/images/arrow-back.png")}
-              style={styles.backBtn}
+              style={[styles.backBtn, { tintColor: "#fff" }]}
               resizeMode="contain"
             />
           </TouchableOpacity>
@@ -577,29 +577,37 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     padding: 24,
-    paddingTop: 48,
+    paddingTop: 0,
   },
   header: {
+    backgroundColor: "#4B2E2B",
+    padding: 24,
+    paddingTop: 56,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     marginBottom: 16,
+    marginHorizontal: -24,
   },
   backBtn: { width: 24, height: 24 },
   title: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#4B2E2B",
+    color: "#fff",
     flex: 1,
     textAlign: "center",
   },
   exportBtn: {
-    backgroundColor: "#4B2E2B",
+    backgroundColor: "rgba(255,255,255,0.25)",
     paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
   },
-  exportBtnDisabled: { backgroundColor: "#ccc" },
+  exportBtnDisabled: { backgroundColor: "rgba(255,255,255,0.1)", borderColor: "transparent" },
   exportText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
   // ─── Kas Card ─────────────────────────────────────────────────────────────────

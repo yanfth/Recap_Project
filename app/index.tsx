@@ -16,6 +16,7 @@ export default function SplashScreen() {
     require("../assets/videos/splash.mp4"),
     (player) => {
       player.loop = false;
+      player.muted = true; // Mute required for autoplay on web
       player.play();
     },
   );
@@ -29,7 +30,7 @@ export default function SplashScreen() {
       if (isSetupDone) {
         router.replace("/login");
       } else {
-        router.replace("/");
+        router.replace("/welcome");
       }
     });
   });

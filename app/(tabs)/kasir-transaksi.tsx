@@ -233,11 +233,18 @@ export default function KasirTransaksi() {
       <View style={styles.pageHeader}>
         <TouchableOpacity
           onPress={handleBack}
-          style={styles.backBtn}
+          style={[styles.backBtn, { flexDirection: "row", alignItems: "center" }]}
           hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
         >
+          {role === "kasir" ? (
+            <Image
+              source={require("../../assets/images/Logout.png")}
+              style={{ width: 14, height: 14, marginRight: 6 }}
+              resizeMode="contain"
+            />
+          ) : null}
           <Text style={styles.backText}>
-            {role === "kasir" ? "🚪 Keluar" : "← Kembali"}
+            {role === "kasir" ? "Keluar" : "← Kembali"}
           </Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
