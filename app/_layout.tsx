@@ -35,17 +35,17 @@ export default function RootLayout() {
               animation: "slide_from_bottom",
             }}
           />
-          <Stack.Screen name="add-stock" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)/add-stock" options={{ headerShown: false }} />
           <Stack.Screen
-            name="kasir-transaksi"
+            name="(tabs)/kasir-transaksi"
             options={{ headerShown: false }}
           />
           <Stack.Screen
-            name="pengaturan-pin"
+            name="(tabs)/pengaturan-pin"
             options={{ headerShown: false }}
           />
-          <Stack.Screen name="Dashboard-owner" options={{ headerShown: false }} />
-          <Stack.Screen name="Dashboard-kasir" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)/Dashboard-owner" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)/Dashboard-kasir" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
