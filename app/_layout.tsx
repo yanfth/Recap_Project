@@ -44,7 +44,8 @@ export default function RootLayout() {
             name="pengaturan-pin"
             options={{ headerShown: false }}
           />
-          <Stack.Screen name="dashboard" options={{ headerShown: false }} />
+          <Stack.Screen name="Dashboard-owner" options={{ headerShown: false }} />
+          <Stack.Screen name="Dashboard-kasir" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

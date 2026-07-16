@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const handleLanjut = async () => {
     if (namaToko.trim() === "") return;
     await AsyncStorage.setItem("nama_toko", namaToko.trim()); // ← simpan
-    router.push(`/dashboard?namaToko=${namaToko}`);
+    router.push(`/Dashboard-owner?namaToko=${namaToko}` as any);
   };
   return (
     <View style={styles.container}>

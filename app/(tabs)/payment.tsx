@@ -15,6 +15,7 @@ import {
 import { clearCart, getCart, getTotalHarga } from "../store/cartStore";
 import { addToHistory } from "../store/historyStore";
 import { editMenuItem, getMenuList } from "../store/menuStore";
+import { useAuth } from "../context/AuthContext";
 
 type CartItem = {
   id: string;
@@ -29,6 +30,7 @@ type MetodeBayar = "Cash" | "QRIS" | null;
 export default function Payment() {
   const { namaToko } = useLocalSearchParams();
   const router = useRouter();
+  const auth = useAuth();
 
   const cartList: CartItem[] = getCart();
   const totalHarga: number = getTotalHarga();
@@ -171,7 +173,11 @@ export default function Payment() {
     });
     clearCart();
     setShowStruk(false);
-    router.push(`/dashboard?namaToko=${namaToko}`);
+    if (auth?.role === "owner") {
+      router.push(`/Dashboard-owner?namaToko=${namaToko}` as any);
+    } else {
+      router.push(`/Dashboard-kasir?namaToko=${namaToko}` as any);
+    }
   };
 
   // Tombol bayar aktif?

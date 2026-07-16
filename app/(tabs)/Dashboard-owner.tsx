@@ -14,14 +14,11 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { Produk, useStock } from "../hooks/useStock";
 
-export default function DashboardScreen() {
+export default function DashboardOwnerScreen() {
   const router = useRouter();
   const { namaToko } = useLocalSearchParams();
   const auth = useAuth();
   const { produkList, loading, editProduk, hapusProduk } = useStock();
-
-  const role = auth?.role;
-  const isOwner = role === "owner";
 
   // ── State untuk popup titik tiga (pilihan Edit/Hapus) ──
   const [selectedProduk, setSelectedProduk] = useState<Produk | null>(null);
@@ -118,13 +115,9 @@ export default function DashboardScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>
-            {isOwner ? "👑 Dashboard Owner" : "🧾 Dashboard Kasir"}
-          </Text>
+          <Text style={styles.greeting}>👑 Dashboard Owner</Text>
           <Text style={styles.subGreeting}>
-            {isOwner
-              ? "Kelola produk, stok, dan modal"
-              : "Siap melayani transaksi"}
+            Kelola produk, stok, dan modal
           </Text>
         </View>
 
@@ -144,58 +137,43 @@ export default function DashboardScreen() {
       </View>
 
       {/* Menu Owner */}
-      {isOwner && (
-        <View style={styles.menuGrid}>
-          <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => router.push("/home")}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.menuIcon}>🏪</Text>
-            <Text style={styles.menuLabel}>Nama Toko</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => router.push("/addmenu" as any)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.menuIcon}>➕</Text>
-            <Text style={styles.menuLabel}>Tambah Produk</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => router.push("/add-stock" as any)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.menuIcon}>📦</Text>
-            <Text style={styles.menuLabel}>Tambah Stok</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => router.push("/pengaturan-pin" as any)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.menuIcon}>🔐</Text>
-            <Text style={styles.menuLabel}>Atur PIN</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Tombol transaksi - Kasir only */}
-      {!isOwner && (
+      <View style={styles.menuGrid}>
         <TouchableOpacity
-          style={styles.transaksiBtn}
-          onPress={() =>
-            router.push(`/kasir-transaksi?namaToko=${namaToko}` as any)
-          }
+          style={styles.menuCard}
+          onPress={() => router.push("/home")}
           activeOpacity={0.8}
         >
-          <Text style={styles.transaksiBtnText}>🧾 Mulai Transaksi</Text>
+          <Text style={styles.menuIcon}>🏪</Text>
+          <Text style={styles.menuLabel}>Nama Toko</Text>
         </TouchableOpacity>
-      )}
+
+        <TouchableOpacity
+          style={styles.menuCard}
+          onPress={() => router.push("/addmenu" as any)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.menuIcon}>➕</Text>
+          <Text style={styles.menuLabel}>Tambah Produk</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuCard}
+          onPress={() => router.push("/add-stock" as any)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.menuIcon}>📦</Text>
+          <Text style={styles.menuLabel}>Tambah Stok</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuCard}
+          onPress={() => router.push("/pengaturan-pin" as any)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.menuIcon}>🔐</Text>
+          <Text style={styles.menuLabel}>Atur PIN</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Daftar produk */}
       <Text style={styles.sectionLabel}>Daftar Produk</Text>
@@ -204,9 +182,7 @@ export default function DashboardScreen() {
         <Text style={styles.emptyText}>Memuat produk...</Text>
       ) : produkList.length === 0 ? (
         <Text style={styles.emptyText}>
-          {isOwner
-            ? 'Belum ada produk. Tap "Tambah Produk" untuk mulai.'
-            : "Belum ada produk. Hubungi owner."}
+          Belum ada produk. Tap "Tambah Produk" untuk mulai.
         </Text>
       ) : (
         <FlatList
@@ -220,11 +196,9 @@ export default function DashboardScreen() {
                 <Text style={styles.produkHarga}>
                   Rp {item.harga.toLocaleString("id-ID")}
                 </Text>
-                {isOwner && (
-                  <Text style={styles.produkModal}>
-                    Modal: Rp {item.modal.toLocaleString("id-ID")}
-                  </Text>
-                )}
+                <Text style={styles.produkModal}>
+                  Modal: Rp {item.modal.toLocaleString("id-ID")}
+                </Text>
               </View>
               <View
                 style={[
@@ -238,15 +212,13 @@ export default function DashboardScreen() {
               </View>
 
               {/* Titik tiga — hanya Owner yang bisa edit/hapus */}
-              {isOwner && (
-                <TouchableOpacity
-                  style={styles.menuTitikTiga}
-                  onPress={() => openActionSheet(item)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Text style={styles.titikTigaText}>⋮</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.menuTitikTiga}
+                onPress={() => openActionSheet(item)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.titikTigaText}>⋮</Text>
+              </TouchableOpacity>
             </View>
           )}
         />
@@ -433,14 +405,6 @@ const styles = StyleSheet.create({
     color: "#4B2E2B",
     textAlign: "center",
   },
-  transaksiBtn: {
-    margin: 20,
-    backgroundColor: "#4B2E2B",
-    paddingVertical: 18,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  transaksiBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   sectionLabel: {
     fontSize: 13,
     fontWeight: "700",

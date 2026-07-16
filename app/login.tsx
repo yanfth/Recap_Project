@@ -72,12 +72,17 @@ export default function PinLoginScreen() {
     if (result === "owner") {
       const savedNamaToko = await AsyncStorage.getItem("nama_toko");
       if (savedNamaToko) {
-        router.replace(`/dashboard?namaToko=${savedNamaToko}`);
+        router.replace(`/Dashboard-owner?namaToko=${savedNamaToko}` as any);
       } else {
         router.replace("/home");
       }
     } else if (result === "kasir") {
-      router.replace("/kasir-transaksi");
+      const savedNamaToko = await AsyncStorage.getItem("nama_toko");
+      if (savedNamaToko) {
+        router.replace(`/Dashboard-kasir?namaToko=${savedNamaToko}` as any);
+      } else {
+        router.replace("/kasir-transaksi");
+      }
     } else {
       shake();
       setPin("");
