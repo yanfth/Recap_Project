@@ -7,6 +7,7 @@ import {
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 import { useCallback, useState } from "react";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import {
   Alert,
   FlatList,
@@ -271,7 +272,7 @@ export default function History() {
 
   // ─── UI ───────────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(400)} style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topArea}>
@@ -565,7 +566,7 @@ export default function History() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </Animated.View>
   );
 }
 

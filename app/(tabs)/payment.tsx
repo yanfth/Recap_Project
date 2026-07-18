@@ -1,5 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import {
   Alert,
   Image,
@@ -184,7 +185,7 @@ export default function Payment() {
   const bayarAktif = !!metodeBayar && cashValid;
 
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(400)} style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Toast */}
@@ -551,7 +552,7 @@ export default function Payment() {
           </View>
         </View>
       </Modal>
-    </View>
+    </Animated.View>
   );
 }
 

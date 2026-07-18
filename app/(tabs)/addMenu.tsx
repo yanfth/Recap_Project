@@ -1,9 +1,12 @@
 import { Stack, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +24,20 @@ export default function AddMenu() {
   const [selectedKategori, setSelectedKategori] = useState("Makanan");
   const [loading, setLoading] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [infoTitle, setInfoTitle] = useState("");
+  const [infoDesc, setInfoDesc] = useState("");
+  const [infoIcon, setInfoIcon] = useState("ℹ️");
+  const [onInfoOk, setOnInfoOk] = useState<(() => void) | null>(null);
+
+  const showModal = (title: string, desc: string, icon: string, onOk?: () => void) => {
+    setInfoTitle(title);
+    setInfoDesc(desc);
+    setInfoIcon(icon);
+    setOnInfoOk(() => onOk || null);
+    setShowInfoModal(true);
+  };
 
   const onPressIn = () =>
     Animated.spring(scaleAnim, {
@@ -46,11 +63,14 @@ export default function AddMenu() {
   const isFormValid = namaMenu.trim() !== "" && harga.trim() !== "";
 
   const handleSimpan = async () => {
-    if (!isFormValid) return;
+    if (!namaMenu.trim()) {
+      showModal("Nama Kosong", "Nama produk tidak boleh kosong.", "⚠️");
+      return;
+    }
 
     const hargaNum = parseInt(harga);
     if (isNaN(hargaNum) || hargaNum <= 0) {
-      Alert.alert("Harga Tidak Valid", "Masukkan harga yang benar.");
+      showModal("Harga Tidak Valid", "Masukkan harga yang benar.", "⚠️");
       return;
     }
 
@@ -63,13 +83,14 @@ export default function AddMenu() {
     });
     setLoading(false);
 
-    router.back();
-    setTimeout(() => {
-      Alert.alert(
-        "Menu Ditambahkan ✅",
-        `"${namaMenu.trim()}" berhasil disimpan.\nTambahkan stok di menu "Tambah Stok".`,
-      );
-    }, 300);
+    showModal(
+      "Menu Ditambahkan",
+      `"${namaMenu.trim()}" berhasil disimpan.\nTambahkan stok di menu "Tambah Stok".`,
+      "✅",
+      () => {
+        router.back();
+      }
+    );
   };
 
   return (
@@ -147,6 +168,41 @@ export default function AddMenu() {
 
         <View style={styles.bottomSheet} />
       </ScrollView>
+
+      <Modal
+        visible={showInfoModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => {
+          setShowInfoModal(false);
+          if (onInfoOk) onInfoOk();
+        }}
+      >
+        <Pressable
+          style={styles.modalOverlayCentered}
+          onPress={() => {
+            setShowInfoModal(false);
+            if (onInfoOk) onInfoOk();
+          }}
+        >
+          <Pressable style={styles.confirmBox} onPress={() => {}}>
+            <Text style={styles.confirmIcon}>{infoIcon}</Text>
+            <Text style={styles.confirmTitle}>{infoTitle}</Text>
+            <Text style={styles.confirmDesc}>{infoDesc}</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={[styles.confirmResetBtn, { backgroundColor: "#4B2E2B" }]}
+                onPress={() => {
+                  setShowInfoModal(false);
+                  if (onInfoOk) onInfoOk();
+                }}
+              >
+                <Text style={styles.confirmResetText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -209,4 +265,48 @@ const styles = StyleSheet.create({
   buttonDisabled: { backgroundColor: "#aaa" },
   buttonText: { color: "#ffffffff", fontSize: 16, fontWeight: "500" },
   bottomSheet: { height: 80, backgroundColor: "#4B2E2B" },
+
+  // ─── Modal ──────────────────────────────────────────────────────
+  modalOverlayCentered: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  confirmBox: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 28,
+    width: "80%",
+    maxWidth: 340,
+    alignItems: "center",
+  },
+  confirmIcon: { fontSize: 40, marginBottom: 12 },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#4B2E2B",
+    marginBottom: 8,
+  },
+  confirmDesc: {
+    fontSize: 14,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  },
+  confirmResetBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#e74c3c",
+    alignItems: "center",
+  },
+  confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
 });
