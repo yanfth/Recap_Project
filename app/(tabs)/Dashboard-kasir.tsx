@@ -1,8 +1,15 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import { useState, useCallback } from "react";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import * as XLSX from "xlsx";
 import {
-  Alert,
+  Platform,
   FlatList,
   Image,
+  Modal,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,30 +17,152 @@ import {
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useStock } from "../hooks/useStock";
+import { clearHistory, getHistory, HistoryOrder } from "../store/historyStore";
 
 export default function DashboardKasirScreen() {
   const router = useRouter();
   const { namaToko } = useLocalSearchParams();
   const auth = useAuth();
   const { produkList, loading } = useStock();
+  const [historyList, setHistoryList] = useState<HistoryOrder[]>([]);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [infoMessage, setInfoMessage] = useState("");
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadData = async () => {
+        const data = await getHistory();
+        setHistoryList(data);
+      };
+      loadData();
+    }, [])
+  );
 
   const handleLogout = () => {
-    Alert.alert("Keluar", "Yakin ingin keluar?", [
-      { text: "Batal", style: "cancel" },
-      {
-        text: "Keluar",
-        style: "destructive",
-        onPress: () => {
-          auth?.logout();
-          router.dismissAll();
-          router.replace("/login");
-        },
-      },
-    ]);
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
+    auth?.logout();
+    router.replace("/login");
+  };
+
+  const handleClearData = () => {
+    setShowClearModal(true);
+  };
+
+  const confirmClearData = async () => {
+    await clearHistory();
+    setHistoryList([]);
+    setShowClearModal(false);
+    setInfoMessage("Data transaksi hari ini berhasil direset.");
+    setShowInfoModal(true);
+  };
+
+  // ─── Export ───────────────────────────────────────────────────────────────────
+  const buildTableData = () => {
+    const tableData: Record<string, string | number>[] = [];
+    historyList.forEach((order) => {
+      const tanggal = new Date(order.waktu);
+      const tglStr = tanggal.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      const jamStr = tanggal.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      order.items.forEach((item) => {
+        const hargaNum =
+          typeof item.harga === "number"
+            ? item.harga
+            : parseInt(String(item.harga), 10) || 0;
+        tableData.push({
+          "Nomor Struk": order.nomorStruk,
+          Tanggal: tglStr,
+          Jam: jamStr,
+          "Metode Bayar": order.metodeBayar,
+          "Nama Menu": item.namaMenu,
+          Kategori: item.kategori ?? "-",
+          "Harga Satuan": hargaNum,
+          Qty: item.qty,
+          Subtotal: hargaNum * item.qty,
+          "Total Transaksi": order.totalHarga,
+        });
+      });
+    });
+    return tableData;
+  };
+
+  const buildWorkbook = () => {
+    const ws = XLSX.utils.json_to_sheet(buildTableData());
+    ws["!cols"] = [
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 8 },
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 6 },
+      { wch: 14 },
+      { wch: 16 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Riwayat Pesanan");
+    return wb;
+  };
+
+  const handleExportWeb = () => {
+    try {
+      const tokoStr = typeof namaToko === "string" ? namaToko : "Toko";
+      XLSX.writeFile(
+        buildWorkbook(),
+        `Riwayat_${tokoStr}_${Date.now()}.xlsx`,
+      );
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleExportNative = async () => {
+    try {
+      const tokoStr = typeof namaToko === "string" ? namaToko : "Toko";
+      const base64 = XLSX.write(buildWorkbook(), {
+        type: "base64",
+        bookType: "xlsx",
+      });
+      const cacheDir = FileSystem.cacheDirectory ?? "";
+      const filePath = `${cacheDir}Riwayat_${tokoStr}_${Date.now()}.xlsx`;
+      await FileSystem.writeAsStringAsync(filePath, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      await Sharing.shareAsync(filePath, {
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        dialogTitle: `Ekspor Riwayat - ${tokoStr}`,
+        UTI: "com.microsoft.excel.xlsx",
+      });
+    } catch (e: any) {
+      setInfoMessage(e?.message ?? "Terjadi kesalahan saat export.");
+      setShowInfoModal(true);
+    }
+  };
+
+  const handleExport = () => {
+    if (historyList.length === 0) {
+      setInfoMessage("Tidak ada data riwayat transaksi untuk di-export.");
+      setShowInfoModal(true);
+      return;
+    }
+    Platform.OS === "web" ? handleExportWeb() : handleExportNative();
   };
 
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(400)} style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
@@ -59,15 +188,37 @@ export default function DashboardKasirScreen() {
       </View>
 
       {/* Tombol transaksi - Kasir only */}
-      <TouchableOpacity
-        style={styles.transaksiBtn}
-        onPress={() =>
-          router.push(`/kasir-transaksi?namaToko=${namaToko}` as any)
-        }
-        activeOpacity={0.8}
-      >
-        <Text style={styles.transaksiBtnText}>🧾 Mulai Transaksi</Text>
-      </TouchableOpacity>
+      <View style={styles.actionButtons}>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <TouchableOpacity
+            style={[styles.transaksiBtn, { flex: 1 }]}
+            onPress={() =>
+              router.push(`/kasir-transaksi?namaToko=${namaToko}` as any)
+            }
+            activeOpacity={0.8}
+          >
+            <Text style={styles.transaksiBtnText}>🧾 Mulai Transaksi</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.transaksiBtn, { flex: 1, backgroundColor: "#27ae60" }]}
+            onPress={handleExport}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.transaksiBtnText}>📄 Export Data</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.transaksiBtn, styles.clearBtn, { marginTop: -4 }]}
+          onPress={handleClearData}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.transaksiBtnText, styles.clearBtnText]}>
+            🗑️ Clear Data Transaksi
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Daftar produk */}
       <Text style={styles.sectionLabel}>Daftar Produk</Text>
@@ -103,7 +254,105 @@ export default function DashboardKasirScreen() {
           )}
         />
       )}
-    </View>
+
+      {/* ─── Modal Konfirmasi Clear Data ─────────────────────────────────────────────── */}
+      <Modal
+        visible={showClearModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowClearModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlayCentered}
+          onPress={() => setShowClearModal(false)}
+        >
+          <Pressable style={styles.confirmBox} onPress={() => {}}>
+            <Text style={styles.confirmIcon}>⚠️</Text>
+            <Text style={styles.confirmTitle}>Clear Data Transaksi?</Text>
+            <Text style={styles.confirmDesc}>
+              Seluruh data transaksi hari ini akan direset.{"\n"}
+              <Text style={{ fontWeight: "700", color: "#4B2E2B" }}>
+                Data tidak dapat dikembalikan!
+              </Text>
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowClearModal(false)}
+              >
+                <Text style={styles.cancelText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmResetBtn}
+                onPress={confirmClearData}
+              >
+                <Text style={styles.confirmResetText}>Clear Data</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── Modal Konfirmasi Logout ─────────────────────────────────────────────── */}
+      <Modal
+        visible={showLogoutModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlayCentered}
+          onPress={() => setShowLogoutModal(false)}
+        >
+          <Pressable style={styles.confirmBox} onPress={() => {}}>
+            <Text style={styles.confirmIcon}>🚪</Text>
+            <Text style={styles.confirmTitle}>Keluar</Text>
+            <Text style={styles.confirmDesc}>Yakin ingin keluar dari akun ini?</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowLogoutModal(false)}
+              >
+                <Text style={styles.cancelText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmResetBtn}
+                onPress={confirmLogout}
+              >
+                <Text style={styles.confirmResetText}>Keluar</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── Modal Info (Export Kosong / Error / Success) ─────────────────────────────────────────────── */}
+      <Modal
+        visible={showInfoModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowInfoModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlayCentered}
+          onPress={() => setShowInfoModal(false)}
+        >
+          <Pressable style={styles.confirmBox} onPress={() => {}}>
+            <Text style={styles.confirmIcon}>ℹ️</Text>
+            <Text style={styles.confirmTitle}>Info</Text>
+            <Text style={styles.confirmDesc}>{infoMessage}</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={[styles.confirmResetBtn, { backgroundColor: "#4B2E2B" }]}
+                onPress={() => setShowInfoModal(false)}
+              >
+                <Text style={styles.confirmResetText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </Animated.View>
   );
 }
 
@@ -138,14 +387,24 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   logoutText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  transaksiBtn: {
+  actionButtons: {
     margin: 20,
+    gap: 12,
+  },
+  transaksiBtn: {
     backgroundColor: "#4B2E2B",
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: "center",
   },
   transaksiBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  clearBtn: {
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: "#e53e3e",
+    paddingVertical: 16,
+  },
+  clearBtnText: { color: "#e53e3e" },
   sectionLabel: {
     fontSize: 13,
     fontWeight: "700",
@@ -188,4 +447,56 @@ const styles = StyleSheet.create({
   },
   stokBadgeHabis: { backgroundColor: "#e53e3e" },
   stokText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+
+  // ─── Confirm Reset Modal ──────────────────────────────────────────────────────
+  modalOverlayCentered: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  confirmBox: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 28,
+    width: "80%",
+    maxWidth: 340,
+    alignItems: "center",
+  },
+  confirmIcon: { fontSize: 40, marginBottom: 12 },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#4B2E2B",
+    marginBottom: 8,
+  },
+  confirmDesc: {
+    fontSize: 14,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#f2f2f2",
+    alignItems: "center",
+  },
+  cancelText: { fontSize: 15, fontWeight: "600", color: "#888" },
+  confirmResetBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#e74c3c",
+    alignItems: "center",
+  },
+  confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
 });

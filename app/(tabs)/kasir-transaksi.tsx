@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import AnimatedReanimated, { FadeIn, FadeOut } from "react-native-reanimated";
 import {
   Alert,
   Animated,
@@ -297,7 +298,7 @@ export default function KasirTransaksi() {
 
   // ─── UI ───────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
+    <AnimatedReanimated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(400)} style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topArea}>
@@ -413,7 +414,7 @@ export default function KasirTransaksi() {
           </Pressable>
         </Animated.View>
       )}
-    </View>
+    </AnimatedReanimated.View>
   );
 }
 

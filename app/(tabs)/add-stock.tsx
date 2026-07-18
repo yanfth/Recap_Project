@@ -3,6 +3,8 @@ import { useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -17,26 +19,43 @@ export default function AddStockScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [jumlah, setJumlah] = useState("");
 
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [infoTitle, setInfoTitle] = useState("");
+  const [infoDesc, setInfoDesc] = useState("");
+  const [infoIcon, setInfoIcon] = useState("ℹ️");
+  const [onInfoOk, setOnInfoOk] = useState<(() => void) | null>(null);
+
+  const showModal = (title: string, desc: string, icon: string, onOk?: () => void) => {
+    setInfoTitle(title);
+    setInfoDesc(desc);
+    setInfoIcon(icon);
+    setOnInfoOk(() => onOk || null);
+    setShowInfoModal(true);
+  };
+
   const selectedProduk = produkList.find((p) => p.id === selectedId);
 
   const handleTambah = async () => {
     if (!selectedId) {
-      Alert.alert("Pilih Produk", "Pilih produk yang ingin ditambah stoknya.");
+      showModal("Pilih Produk", "Pilih produk yang ingin ditambah stoknya.", "⚠️");
       return;
     }
     const qty = parseInt(jumlah);
     if (isNaN(qty) || qty <= 0) {
-      Alert.alert("Jumlah Tidak Valid", "Masukkan jumlah stok yang benar.");
+      showModal("Jumlah Tidak Valid", "Masukkan jumlah stok yang benar.", "⚠️");
       return;
     }
 
     await tambahStok(selectedId, qty);
-    Alert.alert(
-      "Stok Ditambahkan ✅",
+    showModal(
+      "Stok Ditambahkan",
       `${selectedProduk?.nama} +${qty} stok.\nStok sekarang: ${
         (selectedProduk?.stok ?? 0) + qty
       }`,
-      [{ text: "OK", onPress: () => router.back() }],
+      "✅",
+      () => {
+        router.back();
+      }
     );
   };
 
@@ -127,6 +146,42 @@ export default function AddStockScreen() {
           <Text style={styles.buttonText}>+ Tambah Stok</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ─── Modal Info / Success ─────────────────────────────────────────────── */}
+      <Modal
+        visible={showInfoModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => {
+          setShowInfoModal(false);
+          if (onInfoOk) onInfoOk();
+        }}
+      >
+        <Pressable
+          style={styles.modalOverlayCentered}
+          onPress={() => {
+            setShowInfoModal(false);
+            if (onInfoOk) onInfoOk();
+          }}
+        >
+          <Pressable style={styles.confirmBox} onPress={() => {}}>
+            <Text style={styles.confirmIcon}>{infoIcon}</Text>
+            <Text style={styles.confirmTitle}>{infoTitle}</Text>
+            <Text style={styles.confirmDesc}>{infoDesc}</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={[styles.confirmResetBtn, { backgroundColor: "#4B2E2B" }]}
+                onPress={() => {
+                  setShowInfoModal(false);
+                  if (onInfoOk) onInfoOk();
+                }}
+              >
+                <Text style={styles.confirmResetText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -199,4 +254,48 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: "#ccc" },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+
+  // ─── Modal ──────────────────────────────────────────────────────
+  modalOverlayCentered: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  confirmBox: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 28,
+    width: "80%",
+    maxWidth: 340,
+    alignItems: "center",
+  },
+  confirmIcon: { fontSize: 40, marginBottom: 12 },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#4B2E2B",
+    marginBottom: 8,
+  },
+  confirmDesc: {
+    fontSize: 14,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  },
+  confirmResetBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#e74c3c",
+    alignItems: "center",
+  },
+  confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
 });
