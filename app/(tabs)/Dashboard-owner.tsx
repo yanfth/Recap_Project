@@ -238,7 +238,10 @@ export default function DashboardOwnerScreen() {
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>👑 Dashboard Owner</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Image source={require("../../assets/images/Crown.png")} style={{ width: 22, height: 22 }} resizeMode="contain" />
+            <Text style={styles.greeting}>Dashboard Owner</Text>
+          </View>
           <Text style={styles.subGreeting}>Kelola produk, stok, dan modal</Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
@@ -250,29 +253,29 @@ export default function DashboardOwnerScreen() {
       <View style={styles.menuContainer}>
         <View style={styles.menuRow}>
           <TouchableOpacity style={styles.menuCard} onPress={() => router.push("/home")}>
-            <Text style={styles.menuIcon}>🏪</Text>
+            <Image source={require("../../assets/images/Store.png")} style={styles.menuIconImg} resizeMode="contain" />
             <Text style={styles.menuLabel}>Nama Toko</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuCard} onPress={() => router.push("/addmenu" as any)}>
-            <Text style={styles.menuIcon}>➕</Text>
+            <Image source={require("../../assets/images/Add.png")} style={styles.menuIconImg} resizeMode="contain" />
             <Text style={styles.menuLabel}>Tambah Produk</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.menuRow}>
           <TouchableOpacity style={styles.menuCard} onPress={() => router.push("/add-stock" as any)}>
-            <Text style={styles.menuIcon}>📦</Text>
+            <Image source={require("../../assets/images/AddStock.png")} style={styles.menuIconImg} resizeMode="contain" />
             <Text style={styles.menuLabel}>Tambah Stok</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuCard} onPress={() => router.push("/pengaturan-pin" as any)}>
-            <Text style={styles.menuIcon}>🔐</Text>
+            <Image source={require("../../assets/images/Key.png")} style={styles.menuIconImg} resizeMode="contain" />
             <Text style={styles.menuLabel}>Atur PIN</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.centerExportWrapper} pointerEvents="box-none">
           <TouchableOpacity style={styles.centerExportBtn} onPress={handleExport} activeOpacity={0.9}>
-            <Text style={{ fontSize: 20 }}>📄</Text>
+            <Image source={require("../../assets/images/Export.png")} style={{ width: 28, height: 28, tintColor: "#fff" }} resizeMode="contain" />
             <Text style={styles.centerExportText}>Export</Text>
           </TouchableOpacity>
         </View>
@@ -280,7 +283,10 @@ export default function DashboardOwnerScreen() {
 
       <View style={styles.actionButtons}>
         <TouchableOpacity style={styles.clearBtn} onPress={handleClearData} activeOpacity={0.8}>
-          <Text style={styles.clearBtnText}>🗑️ Clear Data Transaksi</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Image source={require("../../assets/images/Trash.png")} style={{ width: 20, height: 20, tintColor: "#e53e3e" }} resizeMode="contain" />
+            <Text style={styles.clearBtnText}>Clear Data Transaksi</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -419,7 +425,11 @@ export default function DashboardOwnerScreen() {
           onPress={() => setShowLogoutModal(false)}
         >
           <Pressable style={styles.confirmBox} onPress={() => {}}>
-            <Text style={styles.confirmIcon}>🚪</Text>
+            <Image 
+              source={require("../../assets/images/Logout.png")} 
+              style={{ width: 40, height: 40, marginBottom: 12 }} 
+              resizeMode="contain" 
+            />
             <Text style={styles.confirmTitle}>Keluar</Text>
             <Text style={styles.confirmDesc}>Yakin ingin keluar dari akun ini?</Text>
             <View style={styles.confirmActions}>
@@ -483,6 +493,7 @@ const styles = StyleSheet.create({
   menuRow: { flexDirection: "row", justifyContent: "space-between" },
   menuCard: { width: "47%", backgroundColor: "#f5f0ee", borderRadius: 16, padding: 24, alignItems: "center", gap: 8 },
   menuIcon: { fontSize: 28 },
+  menuIconImg: { width: 32, height: 32 },
   menuLabel: { fontSize: 13, fontWeight: "600", color: "#4B2E2B", textAlign: "center" },
   centerExportWrapper: { ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center", zIndex: 10, elevation: 6 },
   centerExportBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: "#4B2E2B", borderWidth: 4, borderColor: "#fff", justifyContent: "center", alignItems: "center", elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 5 },
