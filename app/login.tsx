@@ -9,6 +9,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Image,
 } from "react-native";
 import { useAuth } from "./context/AuthContext";
 
@@ -152,10 +153,16 @@ export default function PinLoginScreen() {
 
         <View style={styles.hintRow}>
           <View style={[styles.hintBadge, styles.badgeOwner]}>
-            <Text style={styles.hintText}>👑 Owner</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Image source={require("../assets/images/Crown.png")} style={{ width: 14, height: 14, tintColor: "#fff" }} resizeMode="contain" />
+              <Text style={styles.hintText}>Owner</Text>
+            </View>
           </View>
           <View style={[styles.hintBadge, styles.badgeKasir]}>
-            <Text style={styles.hintText}>🧾 Kasir</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Image source={require("../assets/images/Cashire.png")} style={{ width: 14, height: 14, tintColor: "#fff" }} resizeMode="contain" />
+              <Text style={styles.hintText}>Kasir</Text>
+            </View>
           </View>
         </View>
         <Text style={styles.hintCaption}>PIN owner dan kasir tidak sama</Text>

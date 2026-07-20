@@ -18,6 +18,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useStock } from "../hooks/useStock";
 import { clearHistory, getHistory, HistoryOrder } from "../store/historyStore";
+import { getTotalQty } from "../store/cartStore";
 
 export default function DashboardKasirScreen() {
   const router = useRouter();
@@ -29,12 +30,14 @@ export default function DashboardKasirScreen() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoMessage, setInfoMessage] = useState("");
+  const [totalCart, setTotalCart] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       const loadData = async () => {
         const data = await getHistory();
         setHistoryList(data);
+        setTotalCart(getTotalQty());
       };
       loadData();
     }, [])
@@ -168,7 +171,10 @@ export default function DashboardKasirScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>🧾 Dashboard Kasir</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Image source={require("../../assets/images/Cashire.png")} style={{ width: 22, height: 22 }} resizeMode="contain" />
+            <Text style={styles.greeting}>Dashboard Kasir</Text>
+          </View>
           <Text style={styles.subGreeting}>Siap melayani transaksi</Text>
         </View>
 
@@ -197,7 +203,10 @@ export default function DashboardKasirScreen() {
             }
             activeOpacity={0.8}
           >
-            <Text style={styles.transaksiBtnText}>🧾 Mulai Transaksi</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Image source={require("../../assets/images/Cash.png")} style={{ width: 18, height: 18, tintColor: "#fff" }} resizeMode="contain" />
+              <Text style={styles.transaksiBtnText}>Mulai Transaksi</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -205,7 +214,10 @@ export default function DashboardKasirScreen() {
             onPress={handleExport}
             activeOpacity={0.8}
           >
-            <Text style={styles.transaksiBtnText}>📄 Export Data</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Image source={require("../../assets/images/Export.png")} style={{ width: 18, height: 18, tintColor: "#fff" }} resizeMode="contain" />
+              <Text style={styles.transaksiBtnText}>Export Data</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -214,9 +226,12 @@ export default function DashboardKasirScreen() {
           onPress={handleClearData}
           activeOpacity={0.8}
         >
-          <Text style={[styles.transaksiBtnText, styles.clearBtnText]}>
-            🗑️ Clear Data Transaksi
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center" }}>
+            <Image source={require("../../assets/images/Trash.png")} style={{ width: 18, height: 18, tintColor: "#e53e3e" }} resizeMode="contain" />
+            <Text style={[styles.transaksiBtnText, styles.clearBtnText]}>
+              Clear Data Transaksi
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -254,6 +269,49 @@ export default function DashboardKasirScreen() {
           )}
         />
       )}
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={styles.navItem} onPress={() => {}}>
+          <Image
+            source={require("../../assets/images/home.png")}
+            style={styles.navIcon}
+            resizeMode="contain"
+          />
+          <Text style={styles.navLabel}>Home</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push(`/cart?namaToko=${namaToko}`)}
+        >
+          <View>
+            <Image
+              source={require("../../assets/images/cart.png")}
+              style={styles.navIcon}
+              resizeMode="contain"
+            />
+            {totalCart > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{totalCart}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.navLabel}>Keranjang</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push(`/history?namaToko=${namaToko}`)}
+        >
+          <Image
+            source={require("../../assets/images/History.png")}
+            style={styles.navIcon}
+            resizeMode="contain"
+          />
+          <Text style={styles.navLabel}>Riwayat</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* ─── Modal Konfirmasi Clear Data ─────────────────────────────────────────────── */}
       <Modal
@@ -305,7 +363,11 @@ export default function DashboardKasirScreen() {
           onPress={() => setShowLogoutModal(false)}
         >
           <Pressable style={styles.confirmBox} onPress={() => {}}>
-            <Text style={styles.confirmIcon}>🚪</Text>
+            <Image 
+              source={require("../../assets/images/Logout.png")} 
+              style={{ width: 40, height: 40, marginBottom: 12 }} 
+              resizeMode="contain" 
+            />
             <Text style={styles.confirmTitle}>Keluar</Text>
             <Text style={styles.confirmDesc}>Yakin ingin keluar dari akun ini?</Text>
             <View style={styles.confirmActions}>
@@ -499,4 +561,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
+  bottomNav: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingBottom: 20,
+    backgroundColor: "#4B2E2B",
+  },
+  navItem: { alignItems: "center", gap: 4 },
+  navIcon: { width: 26, height: 26 },
+  navLabel: { fontSize: 10, color: "#d4b8b5", fontWeight: "500" },
+  cartBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: "#e74c3c",
+    borderRadius: 999,
+    width: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cartBadgeText: { color: "#fff", fontSize: 11, fontWeight: "bold" },
 });

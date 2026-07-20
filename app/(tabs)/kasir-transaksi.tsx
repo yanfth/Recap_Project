@@ -251,7 +251,10 @@ export default function KasirTransaksi() {
         <View style={styles.headerCenter}>
           <Text style={styles.tokoName}>{namaToko}</Text>
           <View style={styles.kasirBadge}>
-            <Text style={styles.kasirBadgeText}>🧾 Mode Kasir</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Image source={require("../../assets/images/Store.png")} style={{ width: 12, height: 12, tintColor: "#4B2E2B" }} resizeMode="contain" />
+              <Text style={styles.kasirBadgeText}>Mode Kasir</Text>
+            </View>
           </View>
         </View>
         <View style={{ width: 70 }} />
@@ -347,7 +350,10 @@ export default function KasirTransaksi() {
             },
           ]}
         >
-          <Text style={styles.popupText}>🛒 {totalCart} item di keranjang</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Image source={require("../../assets/images/cart.png")} style={{ width: 18, height: 18, tintColor: "#4B2E2B" }} resizeMode="contain" />
+            <Text style={styles.popupText}>{totalCart} item di keranjang</Text>
+          </View>
         </Animated.View>
       )}
 
@@ -407,7 +413,7 @@ export default function KasirTransaksi() {
             onPressIn={onPressIn}
             onPressOut={onPressOut}
           >
-            <Text style={styles.fabText}>🛒</Text>
+            <Image source={require("../../assets/images/cart.png")} style={{ width: 26, height: 26, tintColor: "#fff" }} resizeMode="contain" />
             <View style={styles.fabBadge}>
               <Text style={styles.fabBadgeText}>{totalCart}</Text>
             </View>

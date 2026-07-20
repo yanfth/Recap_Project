@@ -534,7 +534,7 @@ export default function Payment() {
                 activeOpacity={0.75}
                 disabled={printLoading}
               >
-                <Text style={styles.cetakIcon}>🖨</Text>
+                <Image source={require("../../assets/images/Print.png")} style={{ width: 18, height: 18, tintColor: "#4B2E2B", marginRight: 4 }} resizeMode="contain" />
                 <Text style={styles.cetakText}>
                   {printLoading ? "Mencetak..." : "Cetak Struk"}
                 </Text>
