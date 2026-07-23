@@ -4,12 +4,8 @@ import {
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
-import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system/legacy";
 import { useCallback, useState } from "react";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import {
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -23,9 +19,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import * as XLSX from "xlsx";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { getHistory, HistoryOrder } from "../store/historyStore";
 import { loadKas, resetKas, saveKas } from "../store/kasStore";
+import { handleExportExcel } from "../utils/exportUtils";
 
 export default function History() {
   const { namaToko } = useLocalSearchParams();
@@ -64,9 +61,25 @@ export default function History() {
   // ─── Kalkulasi ────────────────────────────────────────────────────────────────
   const totalPemasukan = historyList.reduce((acc, o) => acc + o.totalHarga, 0);
 
+  const totalUangMasuk = historyList.reduce((acc, o) => {
+    if (o.metodeBayar === "Cash" && o.uangDiterima) {
+      return acc + o.uangDiterima;
+    }
+    return acc + o.totalHarga; // Untuk QRIS/metode lain
+  }, 0);
+
+  const totalKembalian = historyList.reduce((acc, o) => {
+    if (o.metodeBayar === "Cash" && o.kembalian) {
+      return acc + o.kembalian;
+    }
+    return acc;
+  }, 0);
+
   // Jika modal belum diisi, tampilkan 0 sebagai fallback visual
   const modalAwalDisplay = modalAwal ?? 0;
-  const saldoKas = modalAwalDisplay + totalPemasukan;
+  // saldoKas = modal awal + (uang diterima cash + qris) - kembalian cash
+  // yang mana nilainya sama dengan modal awal + totalPemasukan (net revenue)
+  const saldoKas = modalAwalDisplay + totalUangMasuk - totalKembalian;
 
   const formatRp = (val: number) => `Rp ${val.toLocaleString("id-ID")}`;
 
@@ -121,116 +134,9 @@ export default function History() {
     return <Text style={{ fontSize: 12, marginRight: 4 }}>💳</Text>;
   };
 
-  // ─── Export ───────────────────────────────────────────────────────────────────
-  const buildTableData = () => {
-    const tableData: Record<string, string | number>[] = [];
-    historyList.forEach((order) => {
-      const tanggal = new Date(order.waktu);
-      const tglStr = tanggal.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-      const jamStr = tanggal.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      order.items.forEach((item) => {
-        const hargaNum =
-          typeof item.harga === "number"
-            ? item.harga
-            : parseInt(String(item.harga), 10) || 0;
-        tableData.push({
-          "Nomor Struk": order.nomorStruk,
-          Tanggal: tglStr,
-          Jam: jamStr,
-          "Metode Bayar": order.metodeBayar,
-          "Nama Menu": item.namaMenu,
-          Kategori: item.kategori ?? "-",
-          "Harga Satuan": hargaNum,
-          Qty: item.qty,
-          Subtotal: hargaNum * item.qty,
-          "Total Transaksi": order.totalHarga,
-        });
-      });
-    });
-    return tableData;
-  };
-
-  const buildWorkbook = () => {
-    const ws = XLSX.utils.json_to_sheet(buildTableData());
-    ws["!cols"] = [
-      { wch: 18 },
-      { wch: 20 },
-      { wch: 8 },
-      { wch: 14 },
-      { wch: 22 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 6 },
-      { wch: 14 },
-      { wch: 16 },
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Riwayat Pesanan");
-    return wb;
-  };
-
-  const handleExportWeb = () => {
-    try {
-      const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
-      XLSX.writeFile(buildWorkbook(), `Riwayat_${tokoName}_${Date.now()}.xlsx`);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleExportNative = async () => {
-    if (!FileSystem) {
-      Alert.alert("Error", "Modul FileSystem tidak tersedia di platform ini.");
-      return;
-    }
-    try {
-      const tokoName = typeof namaToko === "string" ? namaToko : "Toko";
-      const base64 = XLSX.write(buildWorkbook(), {
-        type: "base64",
-        bookType: "xlsx",
-      });
-      const cacheDir = FileSystem.cacheDirectory ?? "";
-      if (!cacheDir) {
-        Alert.alert("Error", "cacheDirectory tidak tersedia.");
-        return;
-      }
-      const filePath = `${cacheDir}Riwayat_${tokoName}_${Date.now()}.xlsx`;
-      await FileSystem.writeAsStringAsync(filePath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Alert.alert(
-          "Tidak Tersedia",
-          "Fitur share tidak tersedia di perangkat ini.",
-        );
-        return;
-      }
-      await Sharing.shareAsync(filePath, {
-        mimeType:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        dialogTitle: `Ekspor Riwayat - ${tokoName}`,
-        UTI: "com.microsoft.excel.xlsx",
-      });
-    } catch (e: any) {
-      console.error(e);
-      Alert.alert(
-        "Export Gagal",
-        e?.message ?? "Terjadi kesalahan saat export.",
-      );
-    }
-  };
-
-  const handleExport = () => {
+  const handleExport = async () => {
     if (historyList.length === 0) return;
-    Platform.OS === "web" ? handleExportWeb() : handleExportNative();
+    await handleExportExcel(historyList, namaToko, "Toko");
   };
 
   // ─── Render Card ──────────────────────────────────────────────────────────────
@@ -272,7 +178,11 @@ export default function History() {
 
   // ─── UI ───────────────────────────────────────────────────────────────────────
   return (
-    <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(400)} style={styles.container}>
+    <Animated.View
+      entering={FadeIn.duration(400)}
+      exiting={FadeOut.duration(400)}
+      style={styles.container}
+    >
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topArea}>
@@ -334,9 +244,15 @@ export default function History() {
               </Text>
             </View>
             <View style={styles.kasRow}>
-              <Text style={styles.kasLabel}>Total Pemasukan</Text>
+              <Text style={styles.kasLabel}>Uang Masuk</Text>
               <Text style={[styles.kasValue, { color: "#2e7d32" }]}>
-                + {formatRp(totalPemasukan)}
+                + {formatRp(totalUangMasuk)}
+              </Text>
+            </View>
+            <View style={styles.kasRow}>
+              <Text style={styles.kasLabel}>Uang Keluar</Text>
+              <Text style={[styles.kasValue, { color: "#e74c3c" }]}>
+                - {formatRp(totalKembalian)}
               </Text>
             </View>
             <View style={styles.kasDivider} />
@@ -608,7 +524,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.4)",
   },
-  exportBtnDisabled: { backgroundColor: "rgba(255,255,255,0.1)", borderColor: "transparent" },
+  exportBtnDisabled: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderColor: "transparent",
+  },
   exportText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
   // ─── Kas Card ─────────────────────────────────────────────────────────────────

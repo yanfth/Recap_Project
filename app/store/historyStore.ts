@@ -17,6 +17,8 @@ export type HistoryOrder = {
   totalHarga: number;
   metodeBayar: string;
   waktu: string; // ISO string
+  uangDiterima?: number;
+  kembalian?: number;
 };
 
 // Ambil semua history dari AsyncStorage

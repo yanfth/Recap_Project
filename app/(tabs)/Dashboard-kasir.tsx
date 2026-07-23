@@ -1,9 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useState, useCallback } from "react";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
-import * as FileSystem from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
-import * as XLSX from "xlsx";
 import {
   Platform,
   FlatList,
@@ -19,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { useStock } from "../hooks/useStock";
 import { clearHistory, getHistory, HistoryOrder } from "../store/historyStore";
 import { getTotalQty } from "../store/cartStore";
+import { handleExportExcel } from "../utils/exportUtils";
 
 export default function DashboardKasirScreen() {
   const router = useRouter();
@@ -65,103 +63,13 @@ export default function DashboardKasirScreen() {
     setShowInfoModal(true);
   };
 
-  // ─── Export ───────────────────────────────────────────────────────────────────
-  const buildTableData = () => {
-    const tableData: Record<string, string | number>[] = [];
-    historyList.forEach((order) => {
-      const tanggal = new Date(order.waktu);
-      const tglStr = tanggal.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-      const jamStr = tanggal.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      order.items.forEach((item) => {
-        const hargaNum =
-          typeof item.harga === "number"
-            ? item.harga
-            : parseInt(String(item.harga), 10) || 0;
-        tableData.push({
-          "Nomor Struk": order.nomorStruk,
-          Tanggal: tglStr,
-          Jam: jamStr,
-          "Metode Bayar": order.metodeBayar,
-          "Nama Menu": item.namaMenu,
-          Kategori: item.kategori ?? "-",
-          "Harga Satuan": hargaNum,
-          Qty: item.qty,
-          Subtotal: hargaNum * item.qty,
-          "Total Transaksi": order.totalHarga,
-        });
-      });
-    });
-    return tableData;
-  };
-
-  const buildWorkbook = () => {
-    const ws = XLSX.utils.json_to_sheet(buildTableData());
-    ws["!cols"] = [
-      { wch: 18 },
-      { wch: 20 },
-      { wch: 8 },
-      { wch: 14 },
-      { wch: 22 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 6 },
-      { wch: 14 },
-      { wch: 16 },
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Riwayat Pesanan");
-    return wb;
-  };
-
-  const handleExportWeb = () => {
-    try {
-      const tokoStr = typeof namaToko === "string" ? namaToko : "Toko";
-      XLSX.writeFile(
-        buildWorkbook(),
-        `Riwayat_${tokoStr}_${Date.now()}.xlsx`,
-      );
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleExportNative = async () => {
-    try {
-      const tokoStr = typeof namaToko === "string" ? namaToko : "Toko";
-      const base64 = XLSX.write(buildWorkbook(), {
-        type: "base64",
-        bookType: "xlsx",
-      });
-      const cacheDir = FileSystem.cacheDirectory ?? "";
-      const filePath = `${cacheDir}Riwayat_${tokoStr}_${Date.now()}.xlsx`;
-      await FileSystem.writeAsStringAsync(filePath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      await Sharing.shareAsync(filePath, {
-        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        dialogTitle: `Ekspor Riwayat - ${tokoStr}`,
-        UTI: "com.microsoft.excel.xlsx",
-      });
-    } catch (e: any) {
-      setInfoMessage(e?.message ?? "Terjadi kesalahan saat export.");
-      setShowInfoModal(true);
-    }
-  };
-
-  const handleExport = () => {
+  const handleExport = async () => {
     if (historyList.length === 0) {
       setInfoMessage("Tidak ada data riwayat transaksi untuk di-export.");
       setShowInfoModal(true);
       return;
     }
-    Platform.OS === "web" ? handleExportWeb() : handleExportNative();
+    await handleExportExcel(historyList, namaToko, "Toko");
   };
 
   return (

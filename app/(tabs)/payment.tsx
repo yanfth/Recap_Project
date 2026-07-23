@@ -171,6 +171,8 @@ export default function Payment() {
       totalHarga,
       metodeBayar: metodeBayar!,
       waktu: new Date().toISOString(),
+      uangDiterima: metodeBayar === "Cash" ? uangInt : undefined,
+      kembalian: metodeBayar === "Cash" ? kembalian : undefined,
     });
     clearCart();
     setShowStruk(false);
