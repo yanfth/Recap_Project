@@ -49,6 +49,12 @@
     "assetBundlePatterns": [
       "**/*",
       "assets/Videos/*"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "40299906-b210-446f-93a1-c6548c3b7a7a"
+      }
+    }
   }
 }

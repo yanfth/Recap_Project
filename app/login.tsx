@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#4B2E2B",
+    color: "#337066",
     marginBottom: 8,
     textAlign: "center",
   },
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalButton: {
-    backgroundColor: "#4B2E2B",
+    backgroundColor: "#337066",
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 999,
