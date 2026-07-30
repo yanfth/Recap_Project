@@ -19,7 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { getHistory, HistoryOrder } from "../store/historyStore";
 import { loadKas, resetKas, saveKas } from "../store/kasStore";
 import { handleExportExcel } from "../utils/exportUtils";
@@ -30,27 +29,23 @@ export default function History() {
 
   const [historyList, setHistoryList] = useState<HistoryOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<HistoryOrder | null>(null);
+  const [activeFilter, setActiveFilter] = useState("All Transactions");
 
   const [modalAwal, setModalAwal] = useState<number | null>(null);
   const [showKasModal, setShowKasModal] = useState(false);
   const [inputModal, setInputModal] = useState("");
   const [kasDisimpan, setKasDisimpan] = useState(false);
-
-  // Modal konfirmasi reset (ganti Alert agar selalu berfungsi)
   const [showResetModal, setShowResetModal] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       getHistory().then((data) => setHistoryList(data));
 
-      // Load kas — hanya pakai nilainya jika kasDisimpan = true
       loadKas().then(({ modalAwal: saved, kasDisimpan: isSaved }) => {
         if (isSaved && saved > 0) {
-          // User memang sudah mengisi modal sebelumnya
           setModalAwal(saved);
           setKasDisimpan(true);
         } else {
-          // Belum pernah diisi atau sudah di-reset
           setModalAwal(null);
           setKasDisimpan(false);
         }
@@ -58,14 +53,12 @@ export default function History() {
     }, []),
   );
 
-  // ─── Kalkulasi ────────────────────────────────────────────────────────────────
   const totalPemasukan = historyList.reduce((acc, o) => acc + o.totalHarga, 0);
-
   const totalUangMasuk = historyList.reduce((acc, o) => {
     if (o.metodeBayar === "Cash" && o.uangDiterima) {
       return acc + o.uangDiterima;
     }
-    return acc + o.totalHarga; // Untuk QRIS/metode lain
+    return acc + o.totalHarga;
   }, 0);
 
   const totalKembalian = historyList.reduce((acc, o) => {
@@ -75,15 +68,9 @@ export default function History() {
     return acc;
   }, 0);
 
-  // Jika modal belum diisi, tampilkan 0 sebagai fallback visual
   const modalAwalDisplay = modalAwal ?? 0;
-  // saldoKas = modal awal + (uang diterima cash + qris) - kembalian cash
-  // yang mana nilainya sama dengan modal awal + totalPemasukan (net revenue)
   const saldoKas = modalAwalDisplay + totalUangMasuk - totalKembalian;
 
-  const formatRp = (val: number) => `Rp ${val.toLocaleString("id-ID")}`;
-
-  // ─── Handler Kas ──────────────────────────────────────────────────────────────
   const handleSimpanModal = async () => {
     const parsed = parseInt(inputModal.replace(/\D/g, ""), 10);
     if (isNaN(parsed) || parsed < 0) return;
@@ -102,744 +89,570 @@ export default function History() {
     setShowResetModal(false);
   };
 
-  // ─── Util ─────────────────────────────────────────────────────────────────────
-  const formatWaktu = (iso: string) => {
+  const handleExport = async () => {
+    try {
+      await handleExportExcel(historyList, namaToko, "Toko Kasir");
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const formatWaktuPill = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleString("id-ID", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
+    return d.toLocaleTimeString("id-ID", {
       hour: "2-digit",
       minute: "2-digit",
     });
   };
 
-  const metodeIcon = (metode: string) => {
-    if (metode === "QRIS")
-      return (
-        <Image
-          source={require("../../assets/images/Qr.png")}
-          style={{ width: 14, height: 14, marginRight: 4 }}
-          resizeMode="contain"
-        />
-      );
-    if (metode === "Cash")
-      return (
-        <Image
-          source={require("../../assets/images/Cash.png")}
-          style={{ width: 14, height: 14, marginRight: 4 }}
-          resizeMode="contain"
-        />
-      );
-    return <Text style={{ fontSize: 12, marginRight: 4 }}>💳</Text>;
-  };
+  // Filter and Sort History
+  const filteredHistory = historyList
+    .filter((order) => {
+      if (activeFilter === "Cash") return order.metodeBayar === "Cash";
+      if (activeFilter === "QRIS") return order.metodeBayar === "QRIS";
+      return true;
+    })
+    .sort((a, b) => new Date(b.waktu).getTime() - new Date(a.waktu).getTime());
 
-  const handleExport = async () => {
-    if (historyList.length === 0) return;
-    await handleExportExcel(historyList, namaToko, "Toko");
-  };
+  // Group by date
+  const groupedHistory = filteredHistory.reduce((groups, order) => {
+    const orderDate = new Date(order.waktu);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    let key = "";
+    if (orderDate.toDateString() === today.toDateString()) {
+      key = `Today, ${orderDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    } else if (orderDate.toDateString() === yesterday.toDateString()) {
+      key = `Yesterday, ${orderDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    } else {
+      key = orderDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
 
-  // ─── Render Card ──────────────────────────────────────────────────────────────
-  const renderCard = ({ item }: { item: HistoryOrder }) => (
-    <Pressable
-      style={styles.card}
-      onPress={() => setSelectedOrder(item)}
-      android_ripple={{ color: "#e8ecf4" }}
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+    groups[key].push(order);
+    return groups;
+  }, {} as Record<string, HistoryOrder[]>);
+
+  const renderFilter = (label: string) => (
+    <TouchableOpacity
+      style={[styles.filterPill, activeFilter === label && styles.filterPillActive]}
+      onPress={() => setActiveFilter(label)}
     >
-      <View style={styles.accentBar} />
-      <View style={styles.cardContent}>
-        <View style={styles.cardTop}>
-          <View style={styles.badgeRow}>
-            <View
-              style={[
-                styles.metodeBadge,
-                { flexDirection: "row", alignItems: "center" },
-              ]}
-            >
-              {metodeIcon(item.metodeBayar)}
-              <Text style={styles.metodeBadgeText}>{item.metodeBayar}</Text>
-            </View>
-            <Text style={styles.nomorStruk}>{item.nomorStruk}</Text>
-          </View>
-          <Text style={styles.cardTotal}>
-            Rp {item.totalHarga.toLocaleString("id-ID")}
-          </Text>
-        </View>
-        <Text style={styles.itemsPreview} numberOfLines={1}>
-          {item.items.map((i) => `${i.namaMenu} x${i.qty}`).join("  ·  ")}
-        </Text>
-        <View style={styles.cardBottom}>
-          <Text style={styles.waktuText}>🕐 {formatWaktu(item.waktu)}</Text>
-          <Text style={styles.detailHint}>Lihat detail →</Text>
-        </View>
-      </View>
-    </Pressable>
+      <Text style={[styles.filterText, activeFilter === label && styles.filterTextActive]}>{label}</Text>
+    </TouchableOpacity>
   );
 
-  // ─── UI ───────────────────────────────────────────────────────────────────────
   return (
-    <Animated.View
-      entering={FadeIn.duration(400)}
-      exiting={FadeOut.duration(400)}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={styles.topArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={{ width: 40 }}>
-            <Image
-              source={require("../../assets/images/arrow-back.png")}
-              style={[styles.backBtn, { tintColor: "#fff" }]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          <Text style={styles.title}>Riwayat Pesanan</Text>
-          <TouchableOpacity
-            style={[
-              styles.exportBtn,
-              historyList.length === 0 && styles.exportBtnDisabled,
-            ]}
-            onPress={handleExport}
-            disabled={historyList.length === 0}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.exportText}>Export</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Text style={styles.recapHeader}>recap</Text>
+
+        <View style={styles.titleSection}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pageTitle}>Transaction History</Text>
+            <Text style={styles.pageSubtitle}>Review your recent sales and refunds.</Text>
+          </View>
+          <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+            <Text style={styles.exportBtnText}>📄 Export SPS</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Kartu Kas */}
-        <View style={styles.kasCard}>
-          <View style={styles.kasHeader}>
-            <Text style={styles.kasTitle}>Cashbox</Text>
-            <View style={styles.kasHeaderActions}>
-              {kasDisimpan && (
-                <TouchableOpacity
-                  onPress={() => setShowResetModal(true)}
-                  style={styles.resetBtn}
-                >
-                  <Text style={styles.resetText}>Reset</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                onPress={() => {
-                  setInputModal(modalAwal != null ? String(modalAwal) : "");
-                  setShowKasModal(true);
-                }}
-                style={styles.editKasBtn}
-              >
-                <Text style={styles.editKasText}>
-                  {kasDisimpan ? "Ubah" : "+ Isi Modal"}
-                </Text>
-              </TouchableOpacity>
+        {/* Cashbox Summary */}
+        <View style={styles.cashboxCard}>
+          <View style={styles.cashboxHeaderRow}>
+            <View style={styles.cashboxTitleWrap}>
+              <Image source={require("../../assets/images/Cash.png")} style={{ width: 18, height: 18, tintColor: '#4A6D5E' }} resizeMode="contain" />
+              <Text style={styles.cashboxTitle}>Cashbox Summary</Text>
             </View>
-          </View>
-
-          <View style={styles.kasRows}>
-            <View style={styles.kasRow}>
-              <Text style={styles.kasLabel}>Modal Awal</Text>
-              <Text style={styles.kasValue}>
-                {kasDisimpan ? formatRp(modalAwalDisplay) : "Belum diisi"}
-              </Text>
-            </View>
-            <View style={styles.kasRow}>
-              <Text style={styles.kasLabel}>Uang Masuk</Text>
-              <Text style={[styles.kasValue, { color: "#2e7d32" }]}>
-                + {formatRp(totalUangMasuk)}
-              </Text>
-            </View>
-            <View style={styles.kasRow}>
-              <Text style={styles.kasLabel}>Uang Keluar</Text>
-              <Text style={[styles.kasValue, { color: "#e74c3c" }]}>
-                - {formatRp(totalKembalian)}
-              </Text>
-            </View>
-            <View style={styles.kasDivider} />
-            <View style={styles.kasRow}>
-              <Text style={styles.kasSaldoLabel}>Cash Box</Text>
-              <Text style={styles.kasSaldoValue}>{formatRp(saldoKas)}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Summary pill */}
-        {historyList.length > 0 && (
-          <View style={styles.summaryPill}>
-            <Text style={styles.summaryText}>
-              {historyList.length} pesanan selesai
-            </Text>
-            <Text style={styles.summaryTotal}>
-              Total: {formatRp(totalPemasukan)}
-            </Text>
-          </View>
-        )}
-
-        {/* List */}
-        {historyList.length === 0 ? (
-          <View style={styles.emptyArea}>
-            <Text style={styles.emptyIcon}>🧾</Text>
-            <Text style={styles.emptyText}>
-              Belum ada riwayat pesanan{"\n"}Selesaikan transaksi pertamamu!
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={historyList}
-            keyExtractor={(item) => item.nomorStruk}
-            renderItem={renderCard}
-            contentContainerStyle={{
-              gap: 12,
-              paddingTop: 16,
-              paddingBottom: 24,
-            }}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-      </View>
-
-      <View style={styles.bottomBar}>
-        <Text style={styles.bottomBarText}>
-          {historyList.length > 0
-            ? `${historyList.length} transaksi tercatat`
-            : "Riwayat transaksi kamu"}
-        </Text>
-      </View>
-
-      {/* ─── Modal Konfirmasi Reset ─────────────────────────────────────────────── */}
-      <Modal
-        visible={showResetModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowResetModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlayCentered}
-          onPress={() => setShowResetModal(false)}
-        >
-          <Pressable style={styles.confirmBox} onPress={() => {}}>
-            <Text style={styles.confirmIcon}>⚠️</Text>
-            <Text style={styles.confirmTitle}>Reset Modal Awal?</Text>
-            <Text style={styles.confirmDesc}>
-              Modal awal akan direset ke{"\n"}
-              <Text style={{ fontWeight: "700", color: "#4B2E2B" }}>
-                Rp 0
-              </Text>{" "}
-              silahkan isi kembali modal awal tokomu!
-            </Text>
-            <View style={styles.confirmActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setShowResetModal(false)}
-              >
-                <Text style={styles.cancelText}>Batal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmResetBtn}
-                onPress={confirmReset}
-              >
-                <Text style={styles.confirmResetText}>Reset</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* ─── Modal Input Modal Awal ─────────────────────────────────────────────── */}
-      <Modal
-        visible={showKasModal}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowKasModal(false)}
-      >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <Pressable
-            style={{ flex: 1 }}
-            onPress={() => setShowKasModal(false)}
-          />
-          <View style={styles.kasInputBox}>
-            <View style={styles.handleBar} />
-            <Text style={styles.kasInputTitle}>Isi Modal Awal</Text>
-            <Text style={styles.kasInputSubtitle}>
-              Masukkan jumlah uang yang tersedia di Cashbox sebelum berjualan
-            </Text>
-
-            <View style={styles.inputWrapper}>
-              <Text style={styles.inputPrefix}>Rp</Text>
-              <TextInput
-                style={styles.kasTextInput}
-                placeholder="0"
-                placeholderTextColor="#ccc"
-                keyboardType="numeric"
-                value={inputModal}
-                onChangeText={(val) => setInputModal(val.replace(/\D/g, ""))}
-                autoFocus
-              />
-            </View>
-
-            {inputModal.length > 0 && (
-              <Text style={styles.inputPreview}>
-                {formatRp(parseInt(inputModal || "0", 10))}
-              </Text>
-            )}
-
-            <TouchableOpacity
-              style={[
-                styles.simpanBtn,
-                inputModal.length === 0 && styles.simpanBtnDisabled,
-              ]}
-              onPress={handleSimpanModal}
-              disabled={inputModal.length === 0}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.simpanText}>Simpan</Text>
+            <TouchableOpacity onPress={() => setShowResetModal(true)}>
+              <Image source={require("../../assets/images/Trash.png")} style={{ width: 18, height: 18, tintColor: '#99A8A4' }} resizeMode="contain" />
             </TouchableOpacity>
+          </View>
+          
+          <View style={styles.cashboxDataRow}>
+            <View style={styles.cashboxDataItem}>
+              <Text style={styles.cashboxDataLabel}>Total Income</Text>
+              <Text style={styles.cashboxDataValue}>Rp {(totalPemasukan).toLocaleString("id-ID")}</Text>
+            </View>
+            <View style={styles.cashboxDataItem}>
+              <Text style={styles.cashboxDataLabel}>Change Given</Text>
+              <Text style={styles.cashboxDataValue}>Rp {(totalKembalian).toLocaleString("id-ID")}</Text>
+            </View>
+            <View style={[styles.cashboxDataItem, { alignItems: 'flex-end' }]}>
+              <Text style={styles.cashboxDataLabel}>Net Cash</Text>
+              <Text style={[styles.cashboxDataValue, { color: '#1A2E35' }]}>Rp {(saldoKas).toLocaleString("id-ID")}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.cashboxActionRow}>
+            <TouchableOpacity style={styles.fillCashboxBtn} onPress={() => setShowKasModal(true)}>
+              <Text style={styles.fillCashboxText}>⊕ Fill Cashbox</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Filters */}
+        <View style={styles.filterRow}>
+          {renderFilter("All Transactions")}
+          {renderFilter("Cash")}
+          {renderFilter("QRIS")}
+        </View>
+
+        {/* History List Grouped */}
+        {Object.keys(groupedHistory).map(dateKey => (
+          <View key={dateKey} style={styles.dateGroup}>
+            <Text style={styles.dateLabel}>{dateKey}</Text>
+            {groupedHistory[dateKey].map((order, idx) => {
+              const qtyCount = order.items.reduce((sum, i) => sum + i.qty, 0);
+              const isRefunded = order.metodeBayar === 'Refund'; // Just a visual mock if it existed
+
+              return (
+                <View key={order.nomorStruk} style={styles.orderCard}>
+                  <View style={[styles.orderIconBox, isRefunded && styles.orderIconBoxRed]}>
+                    <Image 
+                      source={require("../../assets/images/Cash.png")} 
+                      style={[styles.orderIcon, isRefunded && styles.orderIconRed]} 
+                      resizeMode="contain" 
+                    />
+                  </View>
+                  <View style={styles.orderInfo}>
+                    <View style={styles.orderHeaderRow}>
+                      <Text style={styles.orderNumber}>Order #{order.nomorStruk.slice(-4)}</Text>
+                      <View style={styles.timePill}>
+                        <Text style={styles.timePillText}>{formatWaktuPill(order.waktu)}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.orderDetails}>
+                      {qtyCount} {qtyCount > 1 ? 'items' : 'item'} • {order.metodeBayar}
+                    </Text>
+                  </View>
+                  <View style={styles.orderPriceSec}>
+                    <Text style={styles.orderPrice}>
+                      Rp {order.totalHarga.toLocaleString("id-ID")}
+                    </Text>
+                    <View style={styles.statusRow}>
+                      <Text style={styles.statusIcon}>{isRefunded ? '⊗' : '⊙'}</Text>
+                      <Text style={[styles.statusText, isRefunded && styles.statusTextRed]}>
+                        {isRefunded ? 'Refunded' : 'Completed'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.loadMoreBtn}>
+          <Text style={styles.loadMoreText}>Load More</Text>
+        </TouchableOpacity>
+
+      </ScrollView>
+
+      {/* Modal Edit Modal Awal */}
+      <Modal visible={showKasModal} animationType="fade" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlayCentered}>
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>Ubah Modal Kas</Text>
+            <Text style={styles.confirmDesc}>Masukkan jumlah uang tunai saat buka toko.</Text>
+            <TextInput
+              style={styles.modalInput}
+              keyboardType="numeric"
+              placeholder="Contoh: 100000"
+              value={inputModal}
+              onChangeText={setInputModal}
+            />
+            <View style={styles.confirmActions}>
+              <TouchableOpacity style={styles.confirmBatalBtn} onPress={() => setShowKasModal(false)}>
+                <Text style={styles.confirmBatalText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmResetBtn} onPress={handleSimpanModal}>
+                <Text style={styles.confirmResetText}>Simpan</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ─── Modal Detail Transaksi ──────────────────────────────────────────────── */}
-      <Modal
-        visible={!!selectedOrder}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setSelectedOrder(null)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setSelectedOrder(null)}
-        >
-          <Pressable style={styles.detailBox} onPress={() => {}}>
-            <View style={styles.handleBar} />
-            <View style={styles.detailHeader}>
-              <View>
-                <Text style={styles.detailNomor}>
-                  {selectedOrder?.nomorStruk}
-                </Text>
-                <Text style={styles.detailWaktu}>
-                  {selectedOrder ? formatWaktu(selectedOrder.waktu) : ""}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.detailMetodeBadge,
-                  { flexDirection: "row", alignItems: "center" },
-                ]}
-              >
-                {selectedOrder && metodeIcon(selectedOrder.metodeBayar)}
-                <Text style={styles.detailMetodeText}>
-                  {selectedOrder?.metodeBayar}
-                </Text>
-              </View>
+      {/* Modal Reset Kas */}
+      <Modal visible={showResetModal} animationType="fade" transparent>
+        <View style={styles.modalOverlayCentered}>
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>Reset Cashbox</Text>
+            <Text style={styles.confirmDesc}>Anda yakin ingin mengatur ulang cashbox menjadi Rp 0?</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity style={styles.confirmBatalBtn} onPress={() => setShowResetModal(false)}>
+                <Text style={styles.confirmBatalText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.confirmResetBtn, { backgroundColor: '#E74C3C' }]} onPress={confirmReset}>
+                <Text style={styles.confirmResetText}>Reset</Text>
+              </TouchableOpacity>
             </View>
-
-            <View style={styles.dashedLine} />
-
-            <ScrollView
-              style={{ maxHeight: 220 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {selectedOrder?.items.map((item) => {
-                const hargaNum =
-                  typeof item.harga === "number"
-                    ? item.harga
-                    : parseInt(String(item.harga), 10) || 0;
-                return (
-                  <View key={item.id} style={styles.detailItemRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.detailItemName}>{item.namaMenu}</Text>
-                      <Text style={styles.detailItemQty}>
-                        Rp {hargaNum.toLocaleString("id-ID")} × {item.qty}
-                      </Text>
-                    </View>
-                    <Text style={styles.detailItemTotal}>
-                      Rp {(hargaNum * item.qty).toLocaleString("id-ID")}
-                    </Text>
-                  </View>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.dashedLine} />
-
-            <View style={styles.detailTotalRow}>
-              <Text style={styles.detailTotalLabel}>TOTAL BAYAR</Text>
-              <Text style={styles.detailTotalValue}>
-                Rp {selectedOrder?.totalHarga.toLocaleString("id-ID")}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.tutupBtn}
-              onPress={() => setSelectedOrder(null)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.tutupText}>Tutup</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
-    </Animated.View>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.replace("/Dashboard-kasir" as any)}>
+          <Image source={require("../../assets/images/home.png")} style={styles.navIcon} resizeMode="contain" />
+          <Text style={styles.navLabel}>Home</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.navItem} onPress={() => router.replace("/cart" as any)}>
+          <Image source={require("../../assets/images/cart.png")} style={styles.navIcon} resizeMode="contain" />
+          <Text style={styles.navLabel}>Cart</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.navItem, styles.navItemActive]}>
+          <Image source={require("../../assets/images/History.png")} style={[styles.navIcon, { tintColor: "#3B82F6" }]} resizeMode="contain" />
+          <Text style={[styles.navLabel, styles.navLabelActive]}>History</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#4B2E2B" },
-  topArea: {
+  container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#202528",
+  },
+  scrollContent: {
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 110, // for bottom nav
+    backgroundColor: "#F9FAF9",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    padding: 24,
-    paddingTop: 0,
+    minHeight: '100%',
   },
-  header: {
-    backgroundColor: "#4B2E2B",
-    padding: 24,
-    paddingTop: 56,
+  recapHeader: {
+    textAlign: "center",
+    color: "#6C9484",
+    fontWeight: "700",
+    fontSize: 16,
+    marginBottom: 24,
+    textTransform: "lowercase",
+  },
+  titleSection: {
+    marginBottom: 24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: 16,
-    marginHorizontal: -24,
-  },
-  backBtn: { width: 24, height: 24 },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#fff",
-    flex: 1,
-    textAlign: "center",
   },
   exportBtn: {
-    backgroundColor: "rgba(255,255,255,0.25)",
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.4)",
-  },
-  exportBtnDisabled: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderColor: "transparent",
-  },
-  exportText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-
-  // ─── Kas Card ─────────────────────────────────────────────────────────────────
-  kasCard: {
-    backgroundColor: "#fdf6f0",
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1.5,
-    borderColor: "#e8d5cc",
-  },
-  kasHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  kasTitle: { fontSize: 14, fontWeight: "700", color: "#4B2E2B" },
-  kasHeaderActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  resetBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#e74c3c",
-  },
-  resetText: { fontSize: 11, color: "#e74c3c", fontWeight: "600" },
-  editKasBtn: {
-    backgroundColor: "#4B2E2B",
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  editKasText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  kasRows: { gap: 6 },
-  kasRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  kasLabel: { fontSize: 13, color: "#888" },
-  kasValue: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
-  kasDivider: { height: 1, backgroundColor: "#e8d5cc", marginVertical: 4 },
-  kasSaldoLabel: { fontSize: 14, fontWeight: "700", color: "#4B2E2B" },
-  kasSaldoValue: { fontSize: 16, fontWeight: "800", color: "#4B2E2B" },
-
-  // Summary pill
-  summaryPill: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#4B2E2B",
-    borderRadius: 14,
+    backgroundColor: "#1A2E35",
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 4,
+    borderRadius: 8,
   },
-  summaryText: { fontSize: 13, color: "#fff", fontWeight: "500" },
-  summaryTotal: { fontSize: 14, color: "#fff", fontWeight: "700" },
-
-  // Empty
-  emptyArea: {
+  exportBtnText: {
+    color: "#FFF",
+    fontWeight: "bold",
+    fontSize: 13,
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#1A2E35",
+    marginBottom: 6,
+  },
+  pageSubtitle: {
+    fontSize: 14,
+    color: "#667A80",
+  },
+  
+  /* Cashbox Summary */
+  cashboxCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+    marginBottom: 24,
+  },
+  cashboxHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  cashboxTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  cashboxTitle: {
+    marginLeft: 8,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1A2E35",
+  },
+  cashboxDataRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  cashboxDataItem: {
     flex: 1,
+  },
+  cashboxDataLabel: {
+    fontSize: 12,
+    color: "#99A8A4",
+    marginBottom: 4,
+    fontWeight: "500",
+  },
+  cashboxDataValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#4A6D5E", // default green for money
+  },
+  cashboxActionRow: {
+    alignItems: "flex-end",
+  },
+  fillCashboxBtn: {
+    backgroundColor: "#E2ECE8",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+  },
+  fillCashboxText: {
+    color: "#4A6D5E",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+
+  /* Filters */
+  filterRow: {
+    flexDirection: "row",
+    marginBottom: 24,
+  },
+  filterPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    marginRight: 8,
+  },
+  filterPillActive: {
+    backgroundColor: "#4A6D5E",
+  },
+  filterText: {
+    fontSize: 13,
+    color: "#99A8A4",
+    fontWeight: "500",
+  },
+  filterTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+
+  /* List */
+  dateGroup: {
+    marginBottom: 24,
+  },
+  dateLabel: {
+    fontSize: 13,
+    color: "#667A80",
+    fontWeight: "500",
+    marginBottom: 12,
+  },
+  orderCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  orderIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#E2ECE8",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+    marginRight: 16,
   },
-  emptyIcon: { fontSize: 52 },
-  emptyText: {
-    fontSize: 15,
-    color: "#bbb",
-    textAlign: "center",
-    lineHeight: 24,
+  orderIconBoxRed: {
+    backgroundColor: "#FCE7E7",
   },
-
-  // Card
-  card: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#4B2E2B",
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 3,
+  orderIcon: {
+    width: 20,
+    height: 20,
+    tintColor: "#4A6D5E",
   },
-  accentBar: {
-    width: 5,
-    backgroundColor: "#4B2E2B",
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
+  orderIconRed: {
+    tintColor: "#E74C3C",
   },
-  cardContent: { flex: 1, padding: 14, gap: 6 },
-  cardTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  badgeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  metodeBadge: {
-    backgroundColor: "#f3eeee",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  metodeBadgeText: { fontSize: 11, fontWeight: "600", color: "#4B2E2B" },
-  nomorStruk: { fontSize: 11, color: "#bbb" },
-  cardTotal: { fontSize: 15, fontWeight: "700", color: "#4B2E2B" },
-  itemsPreview: { fontSize: 12, color: "#888" },
-  cardBottom: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 2,
-  },
-  waktuText: { fontSize: 11, color: "#aaa" },
-  detailHint: { fontSize: 11, color: "#4B2E2B", fontWeight: "600" },
-
-  // Bottom bar
-  bottomBar: { paddingVertical: 18, alignItems: "center" },
-  bottomBarText: { fontSize: 13, color: "#fff", fontWeight: "500" },
-
-  // ─── Modal overlay (slide up) ─────────────────────────────────────────────────
-  modalOverlay: {
+  orderInfo: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
+  },
+  orderHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  orderNumber: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1A2E35",
+    marginRight: 8,
+  },
+  timePill: {
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  timePillText: {
+    fontSize: 10,
+    color: "#99A8A4",
+    fontWeight: "600",
+  },
+  orderDetails: {
+    fontSize: 13,
+    color: "#99A8A4",
+  },
+  orderPriceSec: {
+    alignItems: "flex-end",
+  },
+  orderPrice: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A2E35",
+    marginBottom: 4,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statusIcon: {
+    fontSize: 10,
+    color: "#4A6D5E",
+    marginRight: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    color: "#4A6D5E",
+    fontWeight: "500",
+  },
+  statusTextRed: {
+    color: "#E74C3C",
   },
 
-  // ─── Modal overlay (centered — untuk konfirmasi) ──────────────────────────────
+  loadMoreBtn: {
+    backgroundColor: "#F0F0F0",
+    paddingVertical: 12,
+    borderRadius: 999,
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 32,
+  },
+  loadMoreText: {
+    color: "#1A2E35",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+
+  /* Modals */
   modalOverlayCentered: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-
-  // ─── Confirm Reset Modal ──────────────────────────────────────────────────────
   confirmBox: {
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 28,
     width: "80%",
     maxWidth: 340,
-    alignItems: "center",
   },
-  confirmIcon: { fontSize: 40, marginBottom: 12 },
   confirmTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#4B2E2B",
+    color: "#1A2E35",
     marginBottom: 8,
+    textAlign: "center",
   },
   confirmDesc: {
     fontSize: 14,
-    color: "#888",
+    color: "#667A80",
     textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 4,
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: "#F5F5F5",
+    padding: 14,
+    borderRadius: 12,
+    fontSize: 16,
+    color: "#1A2E35",
+    marginBottom: 20,
   },
   confirmActions: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 24,
-    width: "100%",
   },
-  cancelBtn: {
+  confirmBatalBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: "#f2f2f2",
+    backgroundColor: "#E2E8E6",
     alignItems: "center",
   },
-  cancelText: { fontSize: 15, fontWeight: "600", color: "#888" },
+  confirmBatalText: { fontSize: 15, fontWeight: "600", color: "#667A80" },
   confirmResetBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: "#e74c3c",
+    backgroundColor: "#6C9484",
     alignItems: "center",
   },
   confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
 
-  // ─── Kas Input Modal ──────────────────────────────────────────────────────────
-  kasInputBox: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 28,
-    paddingBottom: 48,
-  },
-  kasInputTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#4B2E2B",
-    marginBottom: 6,
-    textAlign: "center",
-  },
-  kasInputSubtitle: {
-    fontSize: 13,
-    color: "#aaa",
-    textAlign: "center",
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  inputWrapper: {
+  /* Bottom Navigation */
+  bottomNav: {
     flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#fdf6f0",
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: "#e8d5cc",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 8,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  inputPrefix: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#4B2E2B",
-    marginRight: 8,
-  },
-  kasTextInput: {
+  navItem: {
     flex: 1,
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#4B2E2B",
-    padding: 0,
-  },
-  inputPreview: {
-    fontSize: 13,
-    color: "#4B2E2B",
-    textAlign: "center",
-    marginBottom: 20,
-    fontWeight: "600",
-  },
-  simpanBtn: {
-    backgroundColor: "#4B2E2B",
-    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
     borderRadius: 999,
-    alignItems: "center",
-    marginTop: 4,
   },
-  simpanBtnDisabled: { backgroundColor: "#ccc" },
-  simpanText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-
-  // Handle bar
-  handleBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#ddd",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 20,
+  navItemActive: {
+    backgroundColor: "#E6F0FF",
   },
-
-  // ─── Detail Modal ─────────────────────────────────────────────────────────────
-  detailBox: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 48,
-  },
-  detailHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 4,
-  },
-  detailNomor: { fontSize: 16, fontWeight: "700", color: "#4B2E2B" },
-  detailWaktu: { fontSize: 12, color: "#aaa", marginTop: 3 },
-  detailMetodeBadge: {
-    backgroundColor: "#4B2E2B",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  detailMetodeText: { fontSize: 12, color: "#fff", fontWeight: "600" },
-  dashedLine: {
-    borderStyle: "dashed",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    marginVertical: 14,
-  },
-  detailItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
-  },
-  detailItemName: { fontSize: 14, fontWeight: "600", color: "#4B2E2B" },
-  detailItemQty: { fontSize: 12, color: "#aaa", marginTop: 1 },
-  detailItemTotal: { fontSize: 13, fontWeight: "600", color: "#4B2E2B" },
-  detailTotalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  detailTotalLabel: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#4B2E2B",
-    letterSpacing: 0.8,
-  },
-  detailTotalValue: { fontSize: 18, fontWeight: "bold", color: "#4B2E2B" },
-  tutupBtn: {
-    backgroundColor: "#4B2E2B",
-    paddingVertical: 15,
-    borderRadius: 999,
-    alignItems: "center",
-  },
-  tutupText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  navIcon: { width: 22, height: 22, tintColor: "#99A8A4", marginBottom: 6 },
+  navLabel: { fontSize: 11, fontWeight: "600", color: "#99A8A4" },
+  navLabelActive: { color: "#3B82F6" },
 });

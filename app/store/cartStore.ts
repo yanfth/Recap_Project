@@ -40,6 +40,19 @@ export const removeFromCart = (id: string) => {
   cartList = cartList.filter((c) => c.id !== id);
 };
 
+export const decreaseCartQty = (id: string) => {
+  const existing = cartList.find((c) => c.id === id);
+  if (existing) {
+    if (existing.qty > 1) {
+      cartList = cartList.map((c) =>
+        c.id === id ? { ...c, qty: c.qty - 1 } : c
+      );
+    } else {
+      removeFromCart(id);
+    }
+  }
+};
+
 export const clearCart = () => {
   cartList = [];
 };

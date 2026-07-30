@@ -1,12 +1,9 @@
 import { Stack, useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
-  Animated,
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,57 +15,33 @@ import { addMenuItem } from "../store/menuStore";
 
 export default function AddMenu() {
   const router = useRouter();
-
+  
   const [namaMenu, setNamaMenu] = useState("");
   const [harga, setHarga] = useState("");
-  const [selectedKategori, setSelectedKategori] = useState("Makanan");
+  const [stokAwal, setStokAwal] = useState("");
+  const [selectedKategori, setSelectedKategori] = useState("Food");
   const [loading, setLoading] = useState(false);
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
+  
+  // Modal states
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoTitle, setInfoTitle] = useState("");
   const [infoDesc, setInfoDesc] = useState("");
   const [infoIcon, setInfoIcon] = useState("ℹ️");
-  const [onInfoOk, setOnInfoOk] = useState<(() => void) | null>(null);
 
-  const showModal = (title: string, desc: string, icon: string, onOk?: () => void) => {
+  const showModal = (title: string, desc: string, icon: string) => {
     setInfoTitle(title);
     setInfoDesc(desc);
     setInfoIcon(icon);
-    setOnInfoOk(() => onOk || null);
     setShowInfoModal(true);
   };
 
-  const onPressIn = () =>
-    Animated.spring(scaleAnim, {
-      toValue: 0.95,
-      useNativeDriver: true,
-    }).start();
-  const onPressOut = () =>
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
-
-  const kategoriOptions = [
-    {
-      id: "Makanan",
-      label: "Food",
-      image: require("../../assets/images/Food.png"),
-    },
-    {
-      id: "Minuman",
-      label: "Drink",
-      image: require("../../assets/images/Drink.png"),
-    },
-  ];
-
-  const isFormValid = namaMenu.trim() !== "" && harga.trim() !== "";
-
-  const handleSimpan = async () => {
+  const handleSimpanBaru = async () => {
     if (!namaMenu.trim()) {
       showModal("Nama Kosong", "Nama produk tidak boleh kosong.", "⚠️");
       return;
     }
 
-    const hargaNum = parseInt(harga);
+    const hargaNum = parseInt(harga.replace(/\D/g, ""));
     if (isNaN(hargaNum) || hargaNum <= 0) {
       showModal("Harga Tidak Valid", "Masukkan harga yang benar.", "⚠️");
       return;
@@ -78,235 +51,295 @@ export default function AddMenu() {
     await addMenuItem({
       namaMenu: namaMenu.trim(),
       harga: String(hargaNum),
-      kategori: selectedKategori,
-      stok: 0,
+      kategori: selectedKategori === "Food" ? "Makanan" : "Minuman",
+      stok: parseInt(stokAwal.replace(/\D/g, "")) || 0,
     });
     setLoading(false);
 
     showModal(
       "Menu Ditambahkan",
-      `"${namaMenu.trim()}" berhasil disimpan.\nTambahkan stok di menu "Tambah Stok".`,
-      "✅",
-      () => {
-        router.back();
-      }
+      `"${namaMenu.trim()}" berhasil disimpan dengan stok awal ${parseInt(stokAwal) || 0}.`,
+      "✅"
     );
+  };
+
+  const closeAndGoBack = () => {
+    setShowInfoModal(false);
+    if (infoIcon === "✅") {
+      router.back();
+    }
   };
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.topArea}>
-          <Text style={styles.title}>Tambah Menu</Text>
-          <Text style={styles.subtitle}>Ayo masukkan Menu Tokomu !</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Image source={require("../../assets/images/arrow-back.png")} style={styles.backIcon} resizeMode="contain" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Kelola Inventaris</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.formContainer}>
+          <Text style={styles.title}>Tambah Barang & Stok</Text>
+          <Text style={styles.subtitle}>Masukkan detail produk baru dan jumlah stok awalnya ke dalam sistem.</Text>
 
           <Text style={styles.label}>Nama Menu</Text>
           <TextInput
             style={styles.input}
-            placeholder="Ayam Goreng"
-            placeholderTextColor="#aaa"
+            placeholder="Contoh: Kopi Susu Aren"
+            placeholderTextColor="#99A8A4"
             value={namaMenu}
             onChangeText={setNamaMenu}
-            underlineColorAndroid="transparent"
           />
 
           <Text style={styles.label}>Harga</Text>
           <TextInput
             style={styles.input}
-            placeholder="contoh: 15000"
-            placeholderTextColor="#aaa"
+            placeholder="Rp  15.000"
+            placeholderTextColor="#99A8A4"
             value={harga}
             onChangeText={setHarga}
             keyboardType="numeric"
-            underlineColorAndroid="transparent"
+          />
+
+          <Text style={styles.label}>Stok Awal</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Contoh: 10 (boleh dikosongi)"
+            placeholderTextColor="#99A8A4"
+            value={stokAwal}
+            onChangeText={setStokAwal}
+            keyboardType="numeric"
           />
 
           <Text style={styles.label}>Kategori</Text>
-          <View style={styles.fotoContainer}>
-            {kategoriOptions.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.fotoCard,
-                  selectedKategori === item.id && styles.fotoCardSelected,
-                ]}
-                onPress={() => setSelectedKategori(item.id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.fotoIconBox}>
-                  <Image
-                    source={item.image}
-                    style={styles.fotoImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.fotoLabel}>{item.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                (!isFormValid || loading) && styles.buttonDisabled,
-              ]}
-              onPress={handleSimpan}
-              onPressIn={onPressIn}
-              onPressOut={onPressOut}
-              disabled={!isFormValid || loading}
-              activeOpacity={1}
+          <View style={styles.kategoriRow}>
+            <TouchableOpacity 
+              style={[styles.kategoriCard, selectedKategori === "Food" && styles.kategoriCardActive]}
+              onPress={() => setSelectedKategori("Food")}
+              activeOpacity={0.8}
             >
-              <Text style={styles.buttonText}>
-                {loading ? "Menyimpan..." : "Simpan Menu"}
-              </Text>
+              <View style={styles.iconCircle}>
+                <Image source={require("../../assets/images/Food.png")} style={styles.kategoriIcon} resizeMode="contain" />
+              </View>
+              <Text style={styles.kategoriText}>Food</Text>
             </TouchableOpacity>
-          </Animated.View>
-        </View>
 
-        <View style={styles.bottomSheet} />
+            <TouchableOpacity 
+              style={[styles.kategoriCard, selectedKategori === "Drink" && styles.kategoriCardActive]}
+              onPress={() => setSelectedKategori("Drink")}
+              activeOpacity={0.8}
+            >
+              <View style={styles.iconCircle}>
+                <Image source={require("../../assets/images/Drink.png")} style={styles.kategoriIcon} resizeMode="contain" />
+              </View>
+              <Text style={styles.kategoriText}>Drink</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
 
-      <Modal
-        visible={showInfoModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => {
-          setShowInfoModal(false);
-          if (onInfoOk) onInfoOk();
-        }}
-      >
-        <Pressable
-          style={styles.modalOverlayCentered}
-          onPress={() => {
-            setShowInfoModal(false);
-            if (onInfoOk) onInfoOk();
-          }}
+      {/* Sticky Bottom Button */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity 
+          style={[styles.submitBtn, loading && { opacity: 0.7 }]} 
+          onPress={handleSimpanBaru}
+          disabled={loading}
         >
-          <Pressable style={styles.confirmBox} onPress={() => {}}>
+          <Text style={styles.submitBtnText}>{loading ? "Menyimpan..." : "Simpan Barang & Stok"}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Info Modal */}
+      <Modal visible={showInfoModal} animationType="fade" transparent>
+        <View style={styles.modalOverlayCentered}>
+          <View style={styles.confirmBox}>
             <Text style={styles.confirmIcon}>{infoIcon}</Text>
             <Text style={styles.confirmTitle}>{infoTitle}</Text>
             <Text style={styles.confirmDesc}>{infoDesc}</Text>
-            <View style={styles.confirmActions}>
-              <TouchableOpacity
-                style={[styles.confirmResetBtn, { backgroundColor: "#4B2E2B" }]}
-                onPress={() => {
-                  setShowInfoModal(false);
-                  if (onInfoOk) onInfoOk();
-                }}
-              >
-                <Text style={styles.confirmResetText}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
+            <TouchableOpacity style={styles.confirmBtn} onPress={closeAndGoBack}>
+              <Text style={styles.confirmBtnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#4B2E2B" },
-  scroll: { flexGrow: 1 },
-  topArea: {
+  container: {
     flex: 1,
-    backgroundColor: "#fff",
-    padding: 28,
-    gap: 12,
-    justifyContent: "center",
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    backgroundColor: "#F4F7F8", // Match the light background in the image
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  backBtn: {
+    padding: 8,
+    marginRight: 8,
+    marginLeft: -8,
+  },
+  backIcon: {
+    width: 20,
+    height: 20,
+    tintColor: "#1A2E35",
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A2E35",
+  },
+  scroll: {
+    paddingBottom: 120,
+  },
+  formContainer: {
+    padding: 24,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#4B2E2B",
-    textAlign: "center",
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#0F2840", // Dark blue from the image
+    marginBottom: 6,
   },
-  subtitle: { fontSize: 14, color: "#444", marginBottom: 8 },
-  label: { fontSize: 14, color: "#333", fontWeight: "500" },
+  subtitle: {
+    fontSize: 12,
+    color: "#667A80",
+    marginBottom: 28,
+    lineHeight: 18,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1A2E35",
+    marginBottom: 8,
+    marginTop: 16,
+  },
   input: {
-    backgroundColor: "#f2f2f2",
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    fontSize: 14,
-    color: "#4B2E2B",
+    backgroundColor: "#EDF1F1",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 13,
+    color: "#1A2E35",
   },
-  fotoContainer: {
+  kategoriRow: {
     flexDirection: "row",
-    gap: 12,
-    backgroundColor: "#f2f2f2",
-    borderRadius: 16,
-    padding: 16,
+    justifyContent: "space-between",
+    gap: 16,
   },
-  fotoCard: { alignItems: "center", gap: 8, opacity: 0.4 },
-  fotoCardSelected: { opacity: 1 },
-  fotoIconBox: {
-    width: 80,
-    height: 80,
+  kategoriCard: {
+    flex: 1,
+    backgroundColor: "#EDF1F1",
     borderRadius: 16,
-    backgroundColor: "#4B2E2B",
+    paddingVertical: 24,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
   },
-  fotoImage: { width: 48, height: 48 },
-  fotoLabel: { fontSize: 12, color: "#444" },
-  button: {
-    backgroundColor: "#4B2E2B",
-    paddingVertical: 14,
-    borderRadius: 999,
+  kategoriCardActive: {
+    borderColor: "#7FA88B",
+    backgroundColor: "#E9EFEA",
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
-    marginTop: 8,
+    justifyContent: "center",
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  buttonDisabled: { backgroundColor: "#aaa" },
-  buttonText: { color: "#ffffffff", fontSize: 16, fontWeight: "500" },
-  bottomSheet: { height: 80, backgroundColor: "#4B2E2B" },
-
-  // ─── Modal ──────────────────────────────────────────────────────
+  kategoriIcon: {
+    width: 20,
+    height: 20,
+  },
+  kategoriText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1A2E35",
+  },
+  bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    paddingBottom: Platform.OS === "ios" ? 32 : 16,
+    borderTopWidth: 1,
+    borderTopColor: "#EAEAEA",
+  },
+  submitBtn: {
+    backgroundColor: "#7FA88B", // Green color from the image
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  submitBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
   modalOverlayCentered: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   confirmBox: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 28,
-    width: "80%",
+    width: '80%',
     maxWidth: 340,
-    alignItems: "center",
+    alignItems: 'center',
   },
-  confirmIcon: { fontSize: 40, marginBottom: 12 },
+  confirmIcon: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
   confirmTitle: {
-    fontSize: 17,
-    fontWeight: "bold",
-    color: "#4B2E2B",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1A2E35",
     marginBottom: 8,
+    textAlign: "center",
   },
   confirmDesc: {
     fontSize: 14,
-    color: "#888",
+    color: "#667A80",
     textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 4,
+    marginBottom: 20,
   },
-  confirmActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
-    width: "100%",
-  },
-  confirmResetBtn: {
-    flex: 1,
+  confirmBtn: {
+    width: '100%',
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: "#e74c3c",
+    backgroundColor: "#7FA88B",
     alignItems: "center",
   },
-  confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
+  confirmBtnText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
+  },
 });

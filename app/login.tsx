@@ -9,11 +9,10 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Image,
 } from "react-native";
 import { useAuth } from "./context/AuthContext";
 
-const BUTTONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
+const BUTTONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "✓"];
 
 export default function PinLoginScreen() {
   const router = useRouter();
@@ -58,12 +57,15 @@ export default function PinLoginScreen() {
       setPin((p) => p.slice(0, -1));
       return;
     }
-    if (val === "" || pin.length >= 4) return;
+    if (val === "✓") {
+      if (pin.length === 4) {
+        handleLogin(pin);
+      }
+      return;
+    }
+    if (pin.length >= 4) return;
     const newPin = pin + val;
     setPin(newPin);
-    if (newPin.length === 4) {
-      setTimeout(() => handleLogin(newPin), 150);
-    }
   };
 
   const handleLogin = async (finalPin: string) => {
@@ -123,129 +125,130 @@ export default function PinLoginScreen() {
       </Modal>
 
       <View style={styles.topArea}>
-        <Text style={styles.appTitle}>Recap</Text>
-        <Text style={styles.subtitle}>Masukkan PIN untuk masuk</Text>
-
-        <Animated.View
-          style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}
-        >
-          {[0, 1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={[styles.dot, pin.length > i && styles.dotFilled]}
-            />
-          ))}
-        </Animated.View>
-
-        <View style={styles.numpad}>
-          {BUTTONS.map((btn, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.numBtn, btn === "" && styles.numBtnHidden]}
-              onPress={() => handlePress(btn)}
-              disabled={btn === "" || loading || !isSetupDone}
-              activeOpacity={0.6}
-            >
-              <Text style={styles.numText}>{btn}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.headerBox}>
+          <Text style={styles.appTitle}>RECAP</Text>
         </View>
+        <Text style={styles.titleText}>Masukkan PIN Keamanan</Text>
+        <Text style={styles.subtitle}>Silakan masukkan PIN 4-digit Anda</Text>
 
-        <View style={styles.hintRow}>
-          <View style={[styles.hintBadge, styles.badgeOwner]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Image source={require("../assets/images/Crown.png")} style={{ width: 14, height: 14, tintColor: "#fff" }} resizeMode="contain" />
-              <Text style={styles.hintText}>Owner</Text>
-            </View>
-          </View>
-          <View style={[styles.hintBadge, styles.badgeKasir]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Image source={require("../assets/images/Cashire.png")} style={{ width: 14, height: 14, tintColor: "#fff" }} resizeMode="contain" />
-              <Text style={styles.hintText}>Kasir</Text>
-            </View>
+        <View style={styles.bottomSection}>
+          <Animated.View
+            style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}
+          >
+            {[0, 1, 2, 3].map((i) => (
+              <View
+                key={i}
+                style={[styles.dot, pin.length > i && styles.dotFilled]}
+              />
+            ))}
+          </Animated.View>
+
+          <View style={styles.numpad}>
+            {BUTTONS.map((btn, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  styles.numBtn,
+                  btn === "⌫" && styles.numBtnBackspace,
+                  btn === "✓" && styles.numBtnSubmit,
+                ]}
+                onPress={() => handlePress(btn)}
+                disabled={loading || !isSetupDone}
+                activeOpacity={0.7}
+              >
+                {btn === "⌫" ? (
+                  <Text style={styles.backspaceIcon}>⌫</Text>
+                ) : btn === "✓" ? (
+                  <Text style={styles.submitIcon}>✓</Text>
+                ) : (
+                  <Text style={styles.numText}>{btn}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
-        <Text style={styles.hintCaption}>PIN owner dan kasir tidak sama</Text>
       </View>
-
-      {!isSetupDone && (
-        <View style={styles.bottomSheet}>
-          <Text style={styles.recapTitle}>Recap</Text>
-          <Text style={styles.recapSubtitle}>
-            Lebih Mudah Berjualan Dengan <Text style={styles.bold}>Recap</Text>
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#F8FBFA" },
   topArea: {
     flex: 1,
-    backgroundColor: "#fff",
-    padding: 32,
-    justifyContent: "center",
     alignItems: "center",
-    gap: 20,
+  },
+  headerBox: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    paddingTop: 60,
+    paddingBottom: 16,
+    alignItems: "center",
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   appTitle: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#4B2E2B",
-    letterSpacing: 0.5,
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#337066",
   },
-  subtitle: { fontSize: 13, color: "#999", marginTop: -8 },
-  dotsRow: { flexDirection: "row", gap: 18, marginVertical: 4 },
+  titleText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A2E35",
+    marginBottom: 8,
+  },
+  subtitle: { fontSize: 13, color: "#667A80", marginBottom: 24 },
+  bottomSection: {
+    marginTop: "auto",
+    marginBottom: 110,
+    alignItems: "center",
+  },
+  dotsRow: { flexDirection: "row", gap: 16, marginBottom: 32 },
   dot: {
-    width: 16,
-    height: 16,
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: "#4B2E2B",
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: "#C5CECD",
     backgroundColor: "transparent",
   },
-  dotFilled: { backgroundColor: "#4B2E2B" },
+  dotFilled: { backgroundColor: "#337066", borderColor: "#337066" },
   numpad: {
     flexDirection: "row",
     flexWrap: "wrap",
-    width: 252,
-    gap: 12,
+    width: 320,
+    gap: 16,
     justifyContent: "center",
   },
   numBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 999,
-    backgroundColor: "#f5f0ee",
+    width: 90,
+    height: 85,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  numBtnHidden: { backgroundColor: "transparent" },
-  numText: { fontSize: 22, fontWeight: "600", color: "#4B2E2B" },
-  hintRow: { flexDirection: "row", gap: 10, marginTop: 4 },
-  hintBadge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 999 },
-  badgeOwner: { backgroundColor: "#4B2E2B" },
-  badgeKasir: { backgroundColor: "#4B2E2B" },
-  hintText: { color: "#fff", fontSize: 12, fontWeight: "500" },
-  hintCaption: { fontSize: 11, color: "#bbb", marginTop: -8 },
-  bottomSheet: {
-    backgroundColor: "#4B2E2B",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 32,
-    paddingBottom: 48,
-    alignItems: "center",
+  numBtnBackspace: {
+    backgroundColor: "#EEF2F2",
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  recapTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 8,
+  numBtnSubmit: {
+    backgroundColor: "#4A6B5C",
   },
-  recapSubtitle: { fontSize: 13, color: "#fff", textAlign: "center" },
-  bold: { fontWeight: "bold", color: "#fff" },
+  numText: { fontSize: 26, fontWeight: "500", color: "#1A2E35" },
+  backspaceIcon: { fontSize: 26, color: "#555" },
+  submitIcon: { fontSize: 28, color: "#FFFFFF", fontWeight: "600" },
 
   // ── Modal / Popup ──
   modalOverlay: {

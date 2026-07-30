@@ -103,10 +103,9 @@ export const handleExportExcel = async (
     const saldoKasAkhir = modalAwal + totalUangMasuk - totalKembalian;
 
     // --- Total Row ---
-    aoa.push(["", "", "", "", "", "", "", "", "", "Total Penghasilan", grandTotalBersih]);
-    aoa.push(["", "", "", "", "", "", "", "", "", "Total Uang Masuk", totalUangMasuk]);
+    aoa.push(["", "", "", "", "", "", "", "", "", "Total Kotor", totalUangMasuk]);
     aoa.push(["", "", "", "", "", "", "", "", "", "Total Kembalian", totalKembalian]);
-    aoa.push(["", "", "", "", "", "", "", "", "", "Total Cashbox", saldoKasAkhir]);
+    aoa.push(["", "", "", "", "", "", "", "", "", "Total Bersih", grandTotalBersih]);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
