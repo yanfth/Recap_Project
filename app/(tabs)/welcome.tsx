@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   bottomSheet: {
-    backgroundColor: "#4B2E2B",
+    backgroundColor: "#1B543A",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 32,
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   buttonText: {
-    color: "#4B2E2B",
+    color: "#1B543A",
     fontSize: 16,
     fontWeight: "500",
   },

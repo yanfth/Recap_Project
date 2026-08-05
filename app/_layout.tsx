@@ -26,7 +26,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ headerShown: false }} />
 
           {/* App screens */}
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {/* App screens (tidak perlu mendeklarasikan (tabs) jika tidak ada _layout.tsx) */}
           <Stack.Screen
             name="modal"
             options={{

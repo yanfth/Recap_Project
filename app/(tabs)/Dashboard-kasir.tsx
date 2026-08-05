@@ -1,9 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
-import * as FileSystem from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
-import * as XLSX from "xlsx";
 import {
   Platform,
   FlatList,
@@ -12,40 +9,31 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
+  SafeAreaView,
+  ScrollView
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import { useStock } from "../hooks/useStock";
-import { clearHistory, getHistory, HistoryOrder } from "../store/historyStore";
-import { getTotalQty } from "../store/cartStore";
+import { useStock, Produk } from "../hooks/useStock";
+import { getHistory, HistoryOrder } from "../store/historyStore";
+import { addToCart, getTotalQty } from "../store/cartStore";
 
 export default function DashboardKasirScreen() {
   const router = useRouter();
   const { namaToko } = useLocalSearchParams();
   const auth = useAuth();
   const { produkList, loading } = useStock();
-  const [historyList, setHistoryList] = useState<HistoryOrder[]>([]);
-  const [showClearModal, setShowClearModal] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All Items");
+  const [totalCart, setTotalCart] = useState(0);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoMessage, setInfoMessage] = useState("");
-  const [totalCart, setTotalCart] = useState(0);
-
-  useFocusEffect(
-    useCallback(() => {
-      const loadData = async () => {
-        const data = await getHistory();
-        setHistoryList(data);
-        setTotalCart(getTotalQty());
-      };
-      loadData();
-    }, [])
-  );
-
-  const handleLogout = () => {
-    setShowLogoutModal(true);
-  };
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const confirmLogout = () => {
     setShowLogoutModal(false);
@@ -53,239 +41,183 @@ export default function DashboardKasirScreen() {
     router.replace("/login");
   };
 
-  const handleClearData = () => {
-    setShowClearModal(true);
-  };
+  useFocusEffect(
+    useCallback(() => {
+      setTotalCart(getTotalQty());
+    }, [])
+  );
 
-  const confirmClearData = async () => {
-    await clearHistory();
-    setHistoryList([]);
-    setShowClearModal(false);
-    setInfoMessage("Data transaksi hari ini berhasil direset.");
-    setShowInfoModal(true);
-  };
+  // Extract unique categories from produkList
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    produkList.forEach(p => cats.add(p.kategori || "Uncategorized"));
+    return ["All Items", ...Array.from(cats)];
+  }, [produkList]);
 
-  // ─── Export ───────────────────────────────────────────────────────────────────
-  const buildTableData = () => {
-    const tableData: Record<string, string | number>[] = [];
-    historyList.forEach((order) => {
-      const tanggal = new Date(order.waktu);
-      const tglStr = tanggal.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-      const jamStr = tanggal.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      order.items.forEach((item) => {
-        const hargaNum =
-          typeof item.harga === "number"
-            ? item.harga
-            : parseInt(String(item.harga), 10) || 0;
-        tableData.push({
-          "Nomor Struk": order.nomorStruk,
-          Tanggal: tglStr,
-          Jam: jamStr,
-          "Metode Bayar": order.metodeBayar,
-          "Nama Menu": item.namaMenu,
-          Kategori: item.kategori ?? "-",
-          "Harga Satuan": hargaNum,
-          Qty: item.qty,
-          Subtotal: hargaNum * item.qty,
-          "Total Transaksi": order.totalHarga,
-        });
-      });
+  // Filter products based on search and active category
+  const filteredProducts = useMemo(() => {
+    return produkList.filter(p => {
+      const matchesSearch = p.nama.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = activeCategory === "All Items" || p.kategori === activeCategory || (!p.kategori && activeCategory === "Uncategorized");
+      return matchesSearch && matchesCategory;
     });
-    return tableData;
-  };
+  }, [produkList, searchQuery, activeCategory]);
 
-  const buildWorkbook = () => {
-    const ws = XLSX.utils.json_to_sheet(buildTableData());
-    ws["!cols"] = [
-      { wch: 18 },
-      { wch: 20 },
-      { wch: 8 },
-      { wch: 14 },
-      { wch: 22 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 6 },
-      { wch: 14 },
-      { wch: 16 },
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Riwayat Pesanan");
-    return wb;
-  };
+  const handleAddToCart = (item: Produk) => {
+    const result = addToCart({
+      id: item.id,
+      namaMenu: item.nama,
+      harga: String(item.harga),
+      kategori: item.kategori,
+      stok: item.stok
+    });
 
-  const handleExportWeb = () => {
-    try {
-      const tokoStr = typeof namaToko === "string" ? namaToko : "Toko";
-      XLSX.writeFile(
-        buildWorkbook(),
-        `Riwayat_${tokoStr}_${Date.now()}.xlsx`,
-      );
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleExportNative = async () => {
-    try {
-      const tokoStr = typeof namaToko === "string" ? namaToko : "Toko";
-      const base64 = XLSX.write(buildWorkbook(), {
-        type: "base64",
-        bookType: "xlsx",
-      });
-      const cacheDir = FileSystem.cacheDirectory ?? "";
-      const filePath = `${cacheDir}Riwayat_${tokoStr}_${Date.now()}.xlsx`;
-      await FileSystem.writeAsStringAsync(filePath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      await Sharing.shareAsync(filePath, {
-        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        dialogTitle: `Ekspor Riwayat - ${tokoStr}`,
-        UTI: "com.microsoft.excel.xlsx",
-      });
-    } catch (e: any) {
-      setInfoMessage(e?.message ?? "Terjadi kesalahan saat export.");
+    if (result === "ok") {
+      setTotalCart(getTotalQty());
+      setToastMessage(`Berhasil menambahkan ${item.nama}`);
+      setToastVisible(true);
+      setTimeout(() => setToastVisible(false), 1500);
+    } else if (result === "stok_habis") {
+      setInfoMessage(`Stok ${item.nama} sudah habis!`);
+      setShowInfoModal(true);
+    } else if (result === "stok_tidak_cukup") {
+      setInfoMessage(`Stok ${item.nama} tidak cukup!`);
       setShowInfoModal(true);
     }
   };
 
-  const handleExport = () => {
-    if (historyList.length === 0) {
-      setInfoMessage("Tidak ada data riwayat transaksi untuk di-export.");
-      setShowInfoModal(true);
-      return;
-    }
-    Platform.OS === "web" ? handleExportWeb() : handleExportNative();
+  const renderProduct = ({ item }: { item: Produk }) => {
+    // Determine image based on category (Food/Drink as fallback logic)
+    const categoryLower = (item.kategori || "").toLowerCase();
+    const isDrink = categoryLower === "minuman" || categoryLower.includes("drink") || categoryLower.includes("tea") || categoryLower.includes("coffee");
+    const imageSource = isDrink 
+      ? require("../../assets/images/Drink.png")
+      : require("../../assets/images/Food.png");
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.imageContainer}>
+          <Image source={imageSource} style={styles.productImage} />
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.productName} numberOfLines={1}>{item.nama}</Text>
+          <Text style={{ fontSize: 11, color: '#99A8A4', marginBottom: 6 }}>Stok: {item.stok}</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.productPrice}>Rp {item.harga.toLocaleString("id-ID")}</Text>
+            <TouchableOpacity 
+              style={styles.addButton} 
+              onPress={() => handleAddToCart(item)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.addButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   return (
-    <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(400)} style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Toast Notification */}
+      {toastVisible && (
+        <Animated.View 
+          entering={FadeIn.duration(200)} 
+          exiting={FadeOut.duration(200)} 
+          style={styles.toastContainer}
+        >
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Image source={require("../../assets/images/Cashire.png")} style={{ width: 22, height: 22 }} resizeMode="contain" />
-            <Text style={styles.greeting}>Dashboard Kasir</Text>
-          </View>
-          <Text style={styles.subGreeting}>Siap melayani transaksi</Text>
-        </View>
+        <TouchableOpacity style={styles.headerIconBtn}>
+           <Text style={{ fontSize: 24, color: '#333' }}>≡</Text>
+        </TouchableOpacity>
+        
+        <Text style={styles.logoText}>recap</Text>
 
-        <TouchableOpacity
-          style={styles.logoutBtn}
-          onPress={handleLogout}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Image
-            source={require("../../assets/images/Logout.png")}
-            style={styles.logoutIcon}
-            resizeMode="contain"
+        <TouchableOpacity style={styles.headerIconBtn} onPress={() => setShowLogoutModal(true)}>
+          <Image 
+            source={require("../../assets/images/Logout.png")} 
+            style={{ width: 22, height: 22, tintColor: '#337066' }} 
+            resizeMode="contain" 
           />
-          <Text style={styles.logoutText}>Keluar</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Tombol transaksi - Kasir only */}
-      <View style={styles.actionButtons}>
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <TouchableOpacity
-            style={[styles.transaksiBtn, { flex: 1 }]}
-            onPress={() =>
-              router.push(`/kasir-transaksi?namaToko=${namaToko}` as any)
-            }
-            activeOpacity={0.8}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Image source={require("../../assets/images/Cash.png")} style={{ width: 18, height: 18, tintColor: "#fff" }} resizeMode="contain" />
-              <Text style={styles.transaksiBtnText}>Mulai Transaksi</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.transaksiBtn, { flex: 1, backgroundColor: "#27ae60" }]}
-            onPress={handleExport}
-            activeOpacity={0.8}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Image source={require("../../assets/images/Export.png")} style={{ width: 18, height: 18, tintColor: "#fff" }} resizeMode="contain" />
-              <Text style={styles.transaksiBtnText}>Export Data</Text>
-            </View>
-          </TouchableOpacity>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput 
+            style={styles.searchInput}
+            placeholder="Search menu..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
         </View>
-
-        <TouchableOpacity
-          style={[styles.transaksiBtn, styles.clearBtn, { marginTop: -4 }]}
-          onPress={handleClearData}
-          activeOpacity={0.8}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center" }}>
-            <Image source={require("../../assets/images/Trash.png")} style={{ width: 18, height: 18, tintColor: "#e53e3e" }} resizeMode="contain" />
-            <Text style={[styles.transaksiBtnText, styles.clearBtnText]}>
-              Clear Data Transaksi
-            </Text>
-          </View>
-        </TouchableOpacity>
       </View>
 
-      {/* Daftar produk */}
-      <Text style={styles.sectionLabel}>Daftar Produk</Text>
-
-      {loading ? (
-        <Text style={styles.emptyText}>Memuat produk...</Text>
-      ) : produkList.length === 0 ? (
-        <Text style={styles.emptyText}>Belum ada produk. Hubungi owner.</Text>
-      ) : (
-        <FlatList
-          data={produkList}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.produkList}
-          renderItem={({ item }) => (
-            <View style={styles.produkRow}>
-              <View style={styles.produkInfo}>
-                <Text style={styles.produkNama}>{item.nama}</Text>
-                <Text style={styles.produkHarga}>
-                  Rp {item.harga.toLocaleString("id-ID")}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.stokBadge,
-                  item.stok === 0 && styles.stokBadgeHabis,
-                ]}
+      {/* Category Pills */}
+      <View style={styles.categoryContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
+          {categories.map((cat, index) => {
+            const isActive = activeCategory === cat;
+            return (
+              <TouchableOpacity 
+                key={index} 
+                style={[styles.categoryPill, isActive && styles.categoryPillActive]}
+                onPress={() => setActiveCategory(cat)}
               >
-                <Text style={styles.stokText}>
-                  {item.stok === 0 ? "Habis" : `${item.stok} pcs`}
+                <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
+                  {cat}
                 </Text>
-              </View>
-            </View>
-          )}
-        />
-      )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Product Grid */}
+      <View style={styles.gridContainer}>
+        {loading ? (
+          <Text style={styles.emptyText}>Memuat menu...</Text>
+        ) : filteredProducts.length === 0 ? (
+          <Text style={styles.emptyText}>Menu tidak ditemukan.</Text>
+        ) : (
+          <FlatList
+            data={filteredProducts}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.flatListContent}
+            columnWrapperStyle={styles.rowWrapper}
+            renderItem={renderProduct}
+          />
+        )}
+      </View>
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => {}}>
+        <TouchableOpacity style={[styles.navItem, styles.navItemActive]} onPress={() => {}}>
           <Image
             source={require("../../assets/images/home.png")}
-            style={styles.navIcon}
+            style={[styles.navIcon, { tintColor: "#3B82F6" }]}
             resizeMode="contain"
           />
-          <Text style={styles.navLabel}>Home</Text>
+          <Text style={[styles.navLabel, styles.navLabelActive]}>Home</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => router.push(`/cart?namaToko=${namaToko}`)}
+          onPress={() => router.push(`/cart?namaToko=${namaToko}` as any)}
         >
-          <View>
+          <View style={styles.cartIconWrapper}>
             <Image
               source={require("../../assets/images/cart.png")}
               style={styles.navIcon}
@@ -297,291 +229,305 @@ export default function DashboardKasirScreen() {
               </View>
             )}
           </View>
-          <Text style={styles.navLabel}>Keranjang</Text>
+          <Text style={styles.navLabel}>Cart</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => router.push(`/history?namaToko=${namaToko}`)}
+          onPress={() => router.push(`/history?namaToko=${namaToko}` as any)}
         >
           <Image
             source={require("../../assets/images/History.png")}
             style={styles.navIcon}
             resizeMode="contain"
           />
-          <Text style={styles.navLabel}>Riwayat</Text>
+          <Text style={styles.navLabel}>History</Text>
         </TouchableOpacity>
       </View>
 
-      {/* ─── Modal Konfirmasi Clear Data ─────────────────────────────────────────────── */}
-      <Modal
-        visible={showClearModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowClearModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlayCentered}
-          onPress={() => setShowClearModal(false)}
-        >
+      {/* Logout Modal */}
+      <Modal visible={showLogoutModal} animationType="fade" transparent onRequestClose={() => setShowLogoutModal(false)}>
+        <Pressable style={styles.modalOverlayCentered} onPress={() => setShowLogoutModal(false)}>
           <Pressable style={styles.confirmBox} onPress={() => {}}>
-            <Text style={styles.confirmIcon}>⚠️</Text>
-            <Text style={styles.confirmTitle}>Clear Data Transaksi?</Text>
-            <Text style={styles.confirmDesc}>
-              Seluruh data transaksi hari ini akan direset.{"\n"}
-              <Text style={{ fontWeight: "700", color: "#4B2E2B" }}>
-                Data tidak dapat dikembalikan!
-              </Text>
-            </Text>
-            <View style={styles.confirmActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setShowClearModal(false)}
-              >
-                <Text style={styles.cancelText}>Batal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmResetBtn}
-                onPress={confirmClearData}
-              >
-                <Text style={styles.confirmResetText}>Clear Data</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* ─── Modal Konfirmasi Logout ─────────────────────────────────────────────── */}
-      <Modal
-        visible={showLogoutModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowLogoutModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlayCentered}
-          onPress={() => setShowLogoutModal(false)}
-        >
-          <Pressable style={styles.confirmBox} onPress={() => {}}>
-            <Image 
-              source={require("../../assets/images/Logout.png")} 
-              style={{ width: 40, height: 40, marginBottom: 12 }} 
-              resizeMode="contain" 
-            />
+            <Image source={require("../../assets/images/Logout.png")} style={{ width: 40, height: 40, marginBottom: 12, tintColor: '#1A2E35' }} resizeMode="contain" />
             <Text style={styles.confirmTitle}>Keluar</Text>
-            <Text style={styles.confirmDesc}>Yakin ingin keluar dari akun ini?</Text>
+            <Text style={styles.confirmDesc}>Yakin ingin keluar?</Text>
             <View style={styles.confirmActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setShowLogoutModal(false)}
-              >
-                <Text style={styles.cancelText}>Batal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmResetBtn}
-                onPress={confirmLogout}
-              >
-                <Text style={styles.confirmResetText}>Keluar</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowLogoutModal(false)}><Text style={styles.cancelText}>Batal</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.confirmResetBtn, { backgroundColor: "#4A6B5C" }]} onPress={confirmLogout}><Text style={styles.confirmResetText}>Keluar</Text></TouchableOpacity>
             </View>
           </Pressable>
         </Pressable>
       </Modal>
 
-      {/* ─── Modal Info (Export Kosong / Error / Success) ─────────────────────────────────────────────── */}
-      <Modal
-        visible={showInfoModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowInfoModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlayCentered}
-          onPress={() => setShowInfoModal(false)}
-        >
+      {/* Info Modal */}
+      <Modal visible={showInfoModal} animationType="fade" transparent onRequestClose={() => setShowInfoModal(false)}>
+        <Pressable style={styles.modalOverlayCentered} onPress={() => setShowInfoModal(false)}>
           <Pressable style={styles.confirmBox} onPress={() => {}}>
             <Text style={styles.confirmIcon}>ℹ️</Text>
             <Text style={styles.confirmTitle}>Info</Text>
             <Text style={styles.confirmDesc}>{infoMessage}</Text>
             <View style={styles.confirmActions}>
-              <TouchableOpacity
-                style={[styles.confirmResetBtn, { backgroundColor: "#4B2E2B" }]}
-                onPress={() => setShowInfoModal(false)}
-              >
+              <TouchableOpacity style={[styles.confirmResetBtn, { backgroundColor: "#6C9484" }]} onPress={() => setShowInfoModal(false)}>
                 <Text style={styles.confirmResetText}>OK</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
         </Pressable>
       </Modal>
-    </Animated.View>
+
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#F8FBFA" },
+  
+  /* Header */
   header: {
-    backgroundColor: "#4B2E2B",
-    padding: 24,
-    paddingTop: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 40 : 10,
+    paddingBottom: 15,
+    backgroundColor: '#F8FBFA'
   },
-  headerLeft: { flex: 1, marginRight: 12 },
-  greeting: { fontSize: 18, fontWeight: "700", color: "#fff" },
-  subGreeting: { fontSize: 13, color: "#d4b8b5", marginTop: 4 },
-  logoutBtn: {
-    backgroundColor: "rgba(255,255,255,0.25)",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.4)",
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  logoutIcon: {
-    width: 14,
-    height: 14,
-    marginRight: 6,
-  },
-  logoutText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  actionButtons: {
-    margin: 20,
-    gap: 12,
-  },
-  transaksiBtn: {
-    backgroundColor: "#4B2E2B",
-    paddingVertical: 18,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  transaksiBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  clearBtn: {
-    backgroundColor: "#fff",
-    borderWidth: 2,
-    borderColor: "#e53e3e",
-    paddingVertical: 16,
-  },
-  clearBtnText: { color: "#e53e3e" },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#4B2E2B",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginHorizontal: 20,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  produkList: { paddingHorizontal: 20, paddingBottom: 32 },
-  emptyText: {
-    textAlign: "center",
-    color: "#aaa",
-    fontSize: 14,
-    marginTop: 24,
-    paddingHorizontal: 32,
-  },
-  produkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f5f0ee",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  produkInfo: { flex: 1 },
-  produkNama: { fontSize: 15, fontWeight: "600", color: "#333" },
-  produkHarga: {
-    fontSize: 13,
-    color: "#4B2E2B",
-    fontWeight: "500",
-    marginTop: 2,
-  },
-  stokBadge: {
-    backgroundColor: "#4B2E2B",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  stokBadgeHabis: { backgroundColor: "#e53e3e" },
-  stokText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-
-  // ─── Confirm Reset Modal ──────────────────────────────────────────────────────
-  modalOverlayCentered: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  confirmBox: {
-    backgroundColor: "#fff",
+  headerIconBtn: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    padding: 28,
-    width: "80%",
-    maxWidth: 340,
-    alignItems: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent'
   },
-  confirmIcon: { fontSize: 40, marginBottom: 12 },
-  confirmTitle: {
-    fontSize: 17,
-    fontWeight: "bold",
-    color: "#4B2E2B",
-    marginBottom: 8,
+  logoText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#337066',
   },
-  confirmDesc: {
+
+  /* Search Bar */
+  searchContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 52,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 10,
+    color: '#999',
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
     fontSize: 14,
-    color: "#888",
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 4,
+    color: '#1A2E35',
   },
-  confirmActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
-    width: "100%",
+
+  /* Categories */
+  categoryContainer: {
+    marginBottom: 20,
   },
-  cancelBtn: {
+  categoryList: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  categoryPill: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  categoryPillActive: {
+    backgroundColor: '#6C9484',
+  },
+  categoryPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#667A80',
+  },
+  categoryPillTextActive: {
+    color: '#FFFFFF',
+  },
+
+  /* Product Grid */
+  gridContainer: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: "#f2f2f2",
-    alignItems: "center",
+    paddingHorizontal: 20,
   },
-  cancelText: { fontSize: 15, fontWeight: "600", color: "#888" },
-  confirmResetBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: "#e74c3c",
-    alignItems: "center",
+  flatListContent: {
+    paddingBottom: 100, // Make room for bottom nav
   },
-  confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
+  rowWrapper: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  card: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 110,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  cardContent: {
+    paddingHorizontal: 4,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A2E35',
+    marginBottom: 6,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  productPrice: {
+    fontSize: 14,
+    color: '#6C9484',
+    fontWeight: '700',
+  },
+  addButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButtonText: {
+    fontSize: 18,
+    lineHeight: 20,
+    color: '#667A80',
+    fontWeight: '400',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#99A8A4',
+    fontSize: 15,
+    marginTop: 40,
+  },
+
+  /* Bottom Navigation */
   bottomNav: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingBottom: 20,
-    backgroundColor: "#4B2E2B",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  navItem: { alignItems: "center", gap: 4 },
-  navIcon: { width: 26, height: 26 },
-  navLabel: { fontSize: 10, color: "#d4b8b5", fontWeight: "500" },
+  navItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  navItemActive: {
+    backgroundColor: "#E6F0FF", // light blue background
+  },
+  navIcon: { width: 22, height: 22, tintColor: "#99A8A4", marginBottom: 6 },
+  navLabel: { fontSize: 11, fontWeight: "600", color: "#99A8A4" },
+  navLabelActive: { color: "#3B82F6" }, // Match icon color
+  cartIconWrapper: {
+    position: 'relative',
+  },
   cartBadge: {
     position: "absolute",
     top: -6,
-    right: -6,
-    backgroundColor: "#e74c3c",
-    borderRadius: 999,
-    width: 18,
+    right: -10,
+    backgroundColor: "#E53E3E",
+    minWidth: 18,
     height: 18,
-    alignItems: "center",
+    borderRadius: 9,
     justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
   },
-  cartBadgeText: { color: "#fff", fontSize: 11, fontWeight: "bold" },
+  cartBadgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+
+  /* Modal */
+  modalOverlayCentered: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  confirmBox: { backgroundColor: '#fff', borderRadius: 20, padding: 28, width: '80%', maxWidth: 340, alignItems: 'center' },
+  confirmIcon: { fontSize: 40, marginBottom: 12 },
+  confirmTitle: { fontSize: 18, fontWeight: "700", color: "#1A2E35", marginBottom: 8 },
+  confirmDesc: { fontSize: 14, color: "#667A80", textAlign: "center", marginBottom: 20 },
+  confirmActions: { flexDirection: "row", gap: 12, marginTop: 24, width: "100%" },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: "#f2f2f2", alignItems: "center" },
+  cancelText: { fontSize: 15, fontWeight: "600", color: "#888" },
+  confirmResetBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: "#e74c3c", alignItems: "center" },
+  confirmResetText: { fontSize: 15, fontWeight: "600", color: "#fff" },
+
+  /* Toast Notification */
+  toastContainer: {
+    position: 'absolute',
+    top: 60,
+    alignSelf: 'center',
+    backgroundColor: '#4A6D5E',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  toastText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
